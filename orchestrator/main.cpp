@@ -191,8 +191,8 @@ int cmd_launch(FrankensteinManager &mgr, const fs::path &base_dir, const std::st
     std::string bin_path = p.slicer_bin;
     if (!fs::exists(bin_path)) {
         // Fallback checks
-        if (fs::exists(R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)")) {
-            bin_path = R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)";
+        if (fs::exists(R"(modular-orca-slicer.exe)")) {
+            bin_path = R"(modular-orca-slicer.exe)";
         } else if (fs::exists("orca-slicer.exe")) {
             bin_path = "orca-slicer.exe";
         } else {
@@ -240,7 +240,7 @@ int cmd_test_dual(const fs::path &base_dir, int duration_sec) {
     FrankensteinManager mgr(base_dir);
     ProcessManager proc_mgr;
 
-    std::string bin = R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)";
+    std::string bin = R"(modular-orca-slicer.exe)";
     fs::path dir1 = base_dir / "environments" / "test-alpha" / "data";
     fs::path dir2 = base_dir / "environments" / "test-beta" / "data";
     fs::create_directories(dir1);

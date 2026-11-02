@@ -26,6 +26,76 @@ ModuleManager::~ModuleManager() {
     unload_all();
 }
 
+bool ModuleManager::auto_configure_from_datadir(const fs::path &data_dir) {
+    fs::path manifest_path = data_dir / "modpack.json";
+    if (fs::exists(manifest_path)) {
+        return load_modpack(manifest_path);
+    }
+
+    log_info("Orchestrator Host Kernel: Auto-discovering modules from presets in: " + data_dir.string());
+
+    // Inspect user process presets
+    fs::path user_dir = data_dir / "user";
+    bool found_wave = false;
+    bool found_resource_opt = false;
+    std::string preset_name = "Modular Default";
+
+    if (fs::exists(user_dir)) {
+        try {
+            for (const auto &entry : fs::recursive_directory_iterator(user_dir)) {
+                if (entry.path().extension() == ".json" && entry.path().parent_path().filename() == "process") {
+                    try {
+                        std::ifstream pf(entry.path());
+                        json pj;
+                        pf >> pj;
+                        if (pj.value("enable_wave_overhangs", "0") == "1") {
+                            found_wave = true;
+                            preset_name = pj.value("name", entry.path().stem().string());
+                        }
+                        if (pj.value("enable_resource_optimizer", "0") == "1") {
+                            found_resource_opt = true;
+                        }
+                    } catch (...) {}
+                }
+            }
+        } catch (...) {}
+    }
+
+    // Generate manifest
+    json manifest;
+    manifest["modpack_id"] = "auto_orchestrated";
+    manifest["name"] = "Modular OrcaSlicer Auto Host";
+    manifest["active_preset"] = preset_name;
+    manifest["mods"] = json::array();
+
+    if (found_wave) {
+        json wm;
+        wm["id"] = "wave_overhangs";
+        wm["name"] = "Wave Overhangs (Built-in Mod)";
+        wm["replaces"] = "OverhangStrategy";
+        wm["enabled"] = true;
+        manifest["mods"].push_back(wm);
+    }
+
+    if (found_resource_opt) {
+        json rm;
+        rm["id"] = "resource_optimizer_lite";
+        rm["name"] = "Low-RAM Large Model Resource Optimizer";
+        rm["replaces"] = "ResourceOptimizer";
+        rm["enabled"] = true;
+        manifest["mods"].push_back(rm);
+    }
+
+    try {
+        std::ofstream out(manifest_path);
+        if (out.is_open()) {
+            out << manifest.dump(2);
+        }
+    } catch (...) {}
+
+    return load_modpack(manifest_path);
+}
+
 bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
     if (!fs::exists(modpack_json_path)) {
         log_error("Modpack manifest not found at: " + modpack_json_path.string());
@@ -39,7 +109,7 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
 
         std::string modpack_id = j.value("modpack_id", "custom_pack");
         std::string modpack_name = j.value("name", "Custom Frankenstein Pack");
-        log_info("Loading Modpack: " + modpack_name + " (" + modpack_id + ")");
+        log_info("Orchestrator Host: Activating Modpack '" + modpack_name + "' [" + modpack_id + "]");
 
         if (!j.contains("mods") || !j["mods"].is_array()) {
             log_warning("Modpack contains no mods array.");
@@ -55,7 +125,7 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
 
             std::string lib_path_str = item.value("library_path", "");
             if (lib_path_str.empty()) {
-                // Check if it matches a built-in strategy (like wave_overhangs)
+                // Built-in strategies
                 if (mod_id == "wave_overhangs") {
                     auto strategy = OverhangStrategyRegistry::instance().get_strategy("wave_overhangs");
                     if (strategy) {
@@ -68,7 +138,7 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
                         info.target_hook = SubsystemHook::OverhangStrategy;
                         info.is_active = true;
                         m_loaded_mods.push_back(info);
-                        log_info("Activated built-in mod: " + info.name);
+                        log_info("Orchestrator Hook Active: [OverhangStrategy] -> Wave Overhangs");
                     }
                     continue;
                 } else if (mod_id == "resource_optimizer_lite") {
@@ -80,7 +150,7 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
                     info.target_hook = SubsystemHook::ResourceOptimizer;
                     info.is_active = true;
                     m_loaded_mods.push_back(info);
-                    log_info("Activated built-in mod: " + info.name);
+                    log_info("Orchestrator Hook Active: [ResourceOptimizer] -> Low-RAM Large Model Resource Optimizer");
                     continue;
                 }
                 continue;
@@ -154,7 +224,7 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
                 info.instance = mod_ptr;
                 info.native_handle = handle;
                 m_loaded_mods.push_back(info);
-                log_info("Successfully initialized mod: " + info.name + " v" + info.version);
+                log_info("Orchestrator Hook Active: [" + std::string(hook_to_string(info.target_hook)) + "] -> " + info.name);
             } else {
                 log_warning("Mod '" + std::string(mod_ptr->get_name()) + "' on_load() returned false.");
             }
@@ -212,15 +282,15 @@ void ModuleManager::register_overhang_strategy(std::shared_ptr<IOverhangStrategy
 }
 
 void ModuleManager::log_info(const std::string &msg) {
-    std::cout << "[OrcaModLoader] [INFO] " << msg << std::endl;
+    std::cout << "[OrchestratorCore] [INFO] " << msg << std::endl;
 }
 
 void ModuleManager::log_warning(const std::string &msg) {
-    std::cout << "[OrcaModLoader] [WARN] " << msg << std::endl;
+    std::cout << "[OrchestratorCore] [WARN] " << msg << std::endl;
 }
 
 void ModuleManager::log_error(const std::string &msg) {
-    std::cerr << "[OrcaModLoader] [ERROR] " << msg << std::endl;
+    std::cerr << "[OrchestratorCore] [ERROR] " << msg << std::endl;
 }
 
 } // namespace Slic3r::Modular

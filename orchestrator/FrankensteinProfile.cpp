@@ -127,7 +127,7 @@ std::vector<ModpackInstance> FrankensteinManager::list_modpacks() const {
                     pack.name = j.value("name", pack.id);
                     pack.description = j.value("description", "");
                     pack.author = j.value("author", "Maker");
-                    pack.slicer_bin = j.value("slicer_bin", R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)");
+                    pack.slicer_bin = j.value("slicer_bin", R"(modular-orca-slicer.exe)");
                     pack.tags = j.value("tags", std::vector<std::string>{});
                     
                     if (j.contains("mods") && j["mods"].is_array()) {
@@ -163,7 +163,7 @@ std::optional<ModpackInstance> FrankensteinManager::get_modpack(const std::strin
         pack.name = j.value("name", pack.id);
         pack.description = j.value("description", "");
         pack.author = j.value("author", "Maker");
-        pack.slicer_bin = j.value("slicer_bin", R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)");
+        pack.slicer_bin = j.value("slicer_bin", R"(modular-orca-slicer.exe)");
         pack.tags = j.value("tags", std::vector<std::string>{});
         
         if (j.contains("mods") && j["mods"].is_array()) {

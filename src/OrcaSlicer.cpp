@@ -8241,19 +8241,13 @@ bool CLI::setup(int argc, char **argv)
         return false;
     }
 
-    // Frankenstein Modular Slicer Hook: Check for modpack manifest
+    // Orchestrator Host Kernel: Initialize subsystems and active modules
     try {
-        boost::filesystem::path manifest_path;
-        if (m_config.has("modpack") && !m_config.opt_string("modpack").empty()) {
-            manifest_path = m_config.opt_string("modpack");
+        std::string mpath = m_config.has("modpack") ? m_config.opt_string("modpack") : "";
+        if (!mpath.empty() && boost::filesystem::exists(mpath)) {
+            Slic3r::Modular::ModuleManager::instance().load_modpack(mpath);
         } else if (!data_dir().empty()) {
-            boost::filesystem::path candidate = boost::filesystem::path(data_dir()) / "modpack.json";
-            if (boost::filesystem::exists(candidate)) {
-                manifest_path = candidate;
-            }
-        }
-        if (!manifest_path.empty() && boost::filesystem::exists(manifest_path)) {
-            Slic3r::Modular::ModuleManager::instance().load_modpack(manifest_path.string());
+            Slic3r::Modular::ModuleManager::instance().auto_configure_from_datadir(data_dir());
         }
     } catch (...) {}
 

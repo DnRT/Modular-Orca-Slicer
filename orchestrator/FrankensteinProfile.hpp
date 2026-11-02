@@ -26,7 +26,7 @@ struct ModpackInstance {
     std::string description;
     std::string author{"Maker"};
     std::vector<std::string> tags;
-    std::string slicer_bin{R"(C:\Program Files\OrcaSlicer\orca-slicer.exe)"};
+    std::string slicer_bin{R"(modular-orca-slicer.exe)"};
     std::vector<ModDescriptor> mods;
     std::vector<std::string> extra_args;
 
