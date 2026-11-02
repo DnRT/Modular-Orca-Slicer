@@ -7,24 +7,22 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Include directories
 include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/compat
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat
 )
 
 # Source files
 set(ORCHESTRATOR_SOURCES
-    src/main.cpp
-    src/ProcessManager.cpp
-    src/ProcessManager.hpp
-    src/FrankensteinProfile.cpp
-    src/FrankensteinProfile.hpp
+    main.cpp
+    ProcessManager.cpp
+    ProcessManager.hpp
+    FrankensteinProfile.cpp
+    FrankensteinProfile.hpp
 )
 
 add_executable(OrcaOrchestrator ${ORCHESTRATOR_SOURCES})
 
-# Windows specific flags
 if (WIN32)
-    # Link with shell and user32 if needed
-    target_link_libraries(OrcaOrchestrator PRIVATE Shell32.lib User32.lib)
+    target_link_libraries(OrcaOrchestrator PRIVATE Shell32 User32)
 endif ()

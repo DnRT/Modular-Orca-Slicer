@@ -28,6 +28,9 @@ endif ()
 
 set(lisbslic3r_sources
     Modular/StrategyFlags.hpp
+    Modular/ModuleABI.hpp
+    Modular/ModuleManager.hpp
+    Modular/ModuleManager.cpp
     Modular/IOverhangStrategy.hpp
     Modular/OverhangStrategyRegistry.hpp
     Modular/OverhangStrategyRegistry.cpp

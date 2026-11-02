@@ -13148,6 +13148,12 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->cli_params = "dir";
     def->set_default_value(new ConfigOptionString());
 
+    def = this->add("modpack", coString);
+    def->label = L("Frankenstein Modpack Manifest");
+    def->tooltip = L("Path to modpack.json manifest configuring community modules and subsystem hooks.");
+    def->cli_params = "path";
+    def->set_default_value(new ConfigOptionString());
+
     def = this->add("export_statistics", coBool);
     def->label = L("Export statistics");
     def->tooltip = L("Write the statistics of each sliced plate as JSON, as plate_N.statistics.json next to its G-code in the output "

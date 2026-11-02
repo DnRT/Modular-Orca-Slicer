@@ -43,6 +43,7 @@
 #include "libslic3r/Point.hpp"
 #include "libslic3r_version.h"
 #include "libslic3r/Semver.hpp"
+#include "libslic3r/Modular/ModuleManager.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/CustomGCode.hpp"
@@ -8239,6 +8240,23 @@ bool CLI::setup(int argc, char **argv)
         boost::nowide::cerr << "Could not create data directory: " << data_dir() << std::endl;
         return false;
     }
+
+    // Frankenstein Modular Slicer Hook: Check for modpack manifest
+    try {
+        boost::filesystem::path manifest_path;
+        if (m_config.has("modpack") && !m_config.opt_string("modpack").empty()) {
+            manifest_path = m_config.opt_string("modpack");
+        } else if (!data_dir().empty()) {
+            boost::filesystem::path candidate = boost::filesystem::path(data_dir()) / "modpack.json";
+            if (boost::filesystem::exists(candidate)) {
+                manifest_path = candidate;
+            }
+        }
+        if (!manifest_path.empty() && boost::filesystem::exists(manifest_path)) {
+            Slic3r::Modular::ModuleManager::instance().load_modpack(manifest_path.string());
+        }
+    } catch (...) {}
+
 
     //FIXME Validating at this stage most likely does not make sense, as the config is not fully initialized yet.
     if (!validity.empty()) {
