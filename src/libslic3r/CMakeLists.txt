@@ -27,6 +27,14 @@ if (SLIC3R_CAD)
 endif ()
 
 set(lisbslic3r_sources
+    Modular/StrategyFlags.hpp
+    Modular/IOverhangStrategy.hpp
+    Modular/OverhangStrategyRegistry.hpp
+    Modular/OverhangStrategyRegistry.cpp
+    Modular/Strategies/WaveOverhangs/WaveAlgorithm.hpp
+    Modular/Strategies/WaveOverhangs/WaveAlgorithm.cpp
+    Modular/Strategies/WaveOverhangs/WaveOverhangStrategy.hpp
+    Modular/Strategies/WaveOverhangs/WaveOverhangStrategy.cpp
     AABBMesh.cpp
     AABBMesh.hpp
     AABBTreeIndirect.hpp

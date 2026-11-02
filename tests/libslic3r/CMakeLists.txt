@@ -28,6 +28,7 @@ add_executable(${_TEST_NAME}_tests
     test_cut_connectors.cpp
     test_config.cpp
     test_compat.cpp
+    test_modular_wave.cpp
     test_config_variant_expansion.cpp
     test_locales_utils.cpp
     test_drc.cpp
