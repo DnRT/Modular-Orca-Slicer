@@ -5,6 +5,7 @@
 #include <wx/utils.h>
 #include "I18N.hpp"
 #include "GUI_App.hpp"
+#include "MainFrame.hpp"
 #include "libslic3r/Modular/ModuleManager.hpp"
 
 namespace Slic3r::GUI {
@@ -150,7 +151,11 @@ void PluginsPanel::on_restart_requested(wxCommandEvent &)
         _L("Restart Modular OrcaSlicer now to apply active plugin and subsystem configurations?"),
         _L("Confirm Restart"), wxYES_NO | wxICON_QUESTION);
     if (answer == wxYES) {
-        wxGetApp().mainframe->Close();
+        wxString exec_path = wxStandardPaths::Get().GetExecutablePath();
+        wxExecute(exec_path);
+        if (wxGetApp().mainframe) {
+            wxGetApp().mainframe->Close();
+        }
     }
 }
 

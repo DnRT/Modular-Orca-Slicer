@@ -492,6 +492,10 @@ if "%build_deps%%build_slicer%" == "" goto :cmake_ready
 
 cmake --version >nul 2>nul
 if not !errorlevel! == 0 (
+    call :setup_dev_env
+)
+cmake --version >nul 2>nul
+if not !errorlevel! == 0 (
     echo CMake was not found. Have you installed the system dependencies?
     exit /b 1
 )

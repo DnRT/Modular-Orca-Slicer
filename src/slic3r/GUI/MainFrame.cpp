@@ -49,6 +49,7 @@
 #include <boost/filesystem/operations.hpp>
 #include "slic3r/GUI/calib_dlg.hpp"
 #include "slic3r/GUI/ParamsPanel.hpp"
+#include "PluginsPanel.hpp"
 #include "slic3r/GUI/UnsavedChangesDialog.hpp"
 #include "slic3r/GUI/Widgets/SideButton.hpp"
 #include <wx/panel.h>
