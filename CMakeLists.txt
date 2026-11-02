@@ -415,6 +415,8 @@ if (MSVC)
     # Disable STL4007: Many result_type typedefs and all argument_type, first_argument_type, and second_argument_type typedefs are deprecated in C++17.
     #FIXME Remove this line after eigen library adapts to the new C++17 adaptor rules.
     add_compile_options(-D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING)
+    add_compile_options(-D_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS)
+    add_compile_options(-D_SILENCE_ALL_CXX23_DEPRECATION_WARNINGS)
     # Disable warnings on conversion from unsigned to signed (possible loss of data)
     # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss of data. An integer type is converted to a smaller integer type.
     # C4267: The compiler detected a conversion from size_t to a smaller type.
@@ -515,8 +517,10 @@ message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
 enable_testing ()
 
 # Enable C++17 language standard.
-set(CMAKE_CXX_STANDARD 17)
+# Enable C++20 language standard with C++23 compatibility foundation.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT WIN32)
     # Add DEBUG flags to debug builds.

@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(OrcaSlicer-native)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include dev-utils for encoding check and other utilities
@@ -10,6 +11,8 @@ add_subdirectory(dev-utils)
 # Note: semver and hints are now included from deps_src/CMakeLists.txt
 
 find_package(libnoise REQUIRED)
+
+add_subdirectory(compat)
 
 add_subdirectory(libslic3r)
 

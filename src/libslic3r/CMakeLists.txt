@@ -758,6 +758,7 @@ endif ()
 
 target_link_libraries(libslic3r
     PUBLIC
+        orca_compat
         Eigen3::Eigen
         admesh
         libigl
