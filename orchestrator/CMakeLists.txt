@@ -12,7 +12,13 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/compat
 )
 
-# Source files
+# 1. Native GUI Launcher (Zero-console turnkey maker entry point)
+add_executable(OrcaSlicerLauncher WIN32 Launcher.cpp)
+if (WIN32)
+    target_link_libraries(OrcaSlicerLauncher PRIVATE Shell32 User32 Ole32)
+endif ()
+
+# 2. CLI Modpack Orchestrator (For advanced maker workflows & automation)
 set(ORCHESTRATOR_SOURCES
     main.cpp
     ProcessManager.cpp
