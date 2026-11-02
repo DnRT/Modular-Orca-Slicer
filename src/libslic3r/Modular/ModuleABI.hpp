@@ -13,7 +13,8 @@ enum class SubsystemHook {
     InfillPattern,         // Replaces or adds infill patterns (e.g. Custom Hilbert, Gyroid 2.0)
     KinematicsEngine,      // Modifies toolpath kinematics (e.g. Non-Planar 3-Axis continuous Z)
     GCodePostProcessor,    // Modifies emitted G-code stream before writing to file
-    CustomUIWidget         // Adds UI parameters/panels dynamically
+    CustomUIWidget,        // Adds UI parameters/panels dynamically
+    ResourceOptimizer      // Optimizes memory & thread scheduling for large models on modest PCs
 };
 
 inline const char* hook_to_string(SubsystemHook hook) {
@@ -23,6 +24,7 @@ inline const char* hook_to_string(SubsystemHook hook) {
         case SubsystemHook::KinematicsEngine:   return "KinematicsEngine";
         case SubsystemHook::GCodePostProcessor: return "GCodePostProcessor";
         case SubsystemHook::CustomUIWidget:     return "CustomUIWidget";
+        case SubsystemHook::ResourceOptimizer:  return "ResourceOptimizer";
         default: return "Unknown";
     }
 }

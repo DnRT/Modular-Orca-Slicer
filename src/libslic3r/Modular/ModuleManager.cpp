@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include "compat/detail/json.hpp"
+#include "Strategies/ResourceOptimizer/ResourceOptimizerMod.hpp"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -69,6 +70,18 @@ bool ModuleManager::load_modpack(const fs::path &modpack_json_path) {
                         m_loaded_mods.push_back(info);
                         log_info("Activated built-in mod: " + info.name);
                     }
+                    continue;
+                } else if (mod_id == "resource_optimizer_lite") {
+                    LoadedModInfo info;
+                    info.id = "resource_optimizer_lite";
+                    info.name = "Low-RAM Large Model Resource Optimizer";
+                    info.version = "1.0.0";
+                    info.author = "Modular RepRap Community";
+                    info.target_hook = SubsystemHook::ResourceOptimizer;
+                    info.is_active = true;
+                    m_loaded_mods.push_back(info);
+                    log_info("Activated built-in mod: " + info.name);
+                    continue;
                 }
                 continue;
             }

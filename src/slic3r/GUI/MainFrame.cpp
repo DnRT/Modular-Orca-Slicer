@@ -1624,6 +1624,9 @@ void MainFrame::init_tabpanel() {
     m_project_page = new LazyPage<ProjectPanel>(m_tabpanel, TAB_ID_PROJECT, 60);
     m_lazy_pages.push_back(m_project_page);
     m_tabpanel->AddPage(TAB_ID_PROJECT, m_project_page, _L("Project"), "tab_auxiliary_active");
+    m_plugins_page = new LazyPage<PluginsPanel>(m_tabpanel, TAB_ID_PLUGINS, 50);
+    m_lazy_pages.push_back(m_plugins_page);
+    m_tabpanel->AddPage(TAB_ID_PLUGINS, m_plugins_page, _L("Plugins"), "tab_plugins_active");
 
     // show_device() removes this tab for printers without the Bambu device tab, and the page
     // then never builds its panel.

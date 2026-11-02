@@ -1,0 +1,12 @@
+{
+    "name": "Modular Wave Overhangs Edition",
+    "from": "User",
+    "inherits": "0.20mm Standard @Anycubic Kobra 2 Plus 0.4 nozzle",
+    "version": "1.3.2505.28",
+    "enable_wave_overhangs": "1",
+    "overhang_strategy": "wave_overhangs",
+    "wave_wavelength": "3.0",
+    "wave_amplitude": "0.8",
+    "wave_propagation_rate": "1.0",
+    "notes": "Preset dedicado para Modular OrcaSlicer con el algoritmo de Wave Overhangs activo."
+}

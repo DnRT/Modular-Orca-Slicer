@@ -52,6 +52,7 @@
 #define TAB_ID_MULTI_DEVICE  "multi_device"
 #define TAB_ID_PROJECT       "project"
 #define TAB_ID_CALIBRATION   "calibration"
+#define TAB_ID_PLUGINS       "plugins"
 
 #define ENABEL_PRINT_ALL 0
 
@@ -79,6 +80,7 @@ class MonitorPanel;
 class MultiMachinePage;
 class ProjectPanel;
 class CalibrationPanel;
+class PluginsPanel;
 class PrinterWebView;
 class FilamentGroupPopup;
 class PA_Calibration_Dlg;
@@ -529,6 +531,7 @@ public:
     //AuxiliaryPanel*       m_auxiliary{ nullptr };
     LazyPage<MultiMachinePage>* m_multi_machine_page{ nullptr };
     LazyPage<ProjectPanel>* m_project_page{ nullptr };
+    LazyPage<PluginsPanel>* m_plugins_page{ nullptr };
 
     LazyPage<CalibrationPanel>* m_calibration_page{ nullptr };
     LazyPage<WebViewPanel>* m_home_page { nullptr };

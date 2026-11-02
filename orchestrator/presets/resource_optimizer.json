@@ -1,0 +1,8 @@
+{
+    "name": "Modular Large Model Resource Optimizer",
+    "from": "User",
+    "inherits": "0.20mm Standard @Anycubic Kobra 2 Plus 0.4 nozzle",
+    "version": "1.3.2505.28",
+    "enable_resource_optimizer": "1",
+    "notes": "Preset dedicado para Modular OrcaSlicer con optimizador de memoria RAM y desacoplamiento de chunks para modelos gigantes."
+}
