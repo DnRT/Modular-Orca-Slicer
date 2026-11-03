@@ -2221,6 +2221,8 @@ public:
     bool                        operator< (const ConfigOptionInts& rhs) const throw() { return this->values < rhs.values; }
 
     using ConfigOptionInts::operator==;
+    bool                        operator==(const ConfigOptionEnumsGenericTempl& rhs) const throw() { return this->values == rhs.values; }
+    bool                        operator!=(const ConfigOptionEnumsGenericTempl& rhs) const throw() { return this->values != rhs.values; }
     bool                        operator==(const ConfigOptionInts& rhs) const
     {
         if (rhs.type() != this->type())

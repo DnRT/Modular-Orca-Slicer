@@ -82,7 +82,11 @@ using enable_if_t = typename std::enable_if<B, T>::type;
 
 template<class F, class...Args>
 struct invoke_result {
+#if __cplusplus >= 201703L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+    using type = typename std::invoke_result<F, Args...>::type;
+#else
     using type = typename std::result_of<F(Args...)>::type;
+#endif
 };
 
 template<class F, class...Args>
@@ -162,6 +166,14 @@ inline bool operator==(const Degrees& deg, const Radians& rads) {
 
 inline bool operator==(const Radians& rads, const Degrees& deg) {
     return deg == rads;
+}
+
+inline bool operator==(const Radians& r1, const Radians& r2) {
+    return std::abs(static_cast<double>(r1) - static_cast<double>(r2)) < 0.0001;
+}
+
+inline bool operator==(const Degrees& d1, const Degrees& d2) {
+    return std::abs(static_cast<double>(d1) - static_cast<double>(d2)) < 0.0001;
 }
 
 inline Radians::operator Degrees() { return *this * 180/Pi; }

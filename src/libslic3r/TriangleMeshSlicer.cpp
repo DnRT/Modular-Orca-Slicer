@@ -131,6 +131,9 @@ public:
 
     // feGeneral, feTop, feBottom, feHorizontal
     FacetEdgeType   edge_type { FacetEdgeType::General };
+
+    IntersectionLine(const Line &line, int a_id, int b_id, int edge_a_id, int edge_b_id, FacetEdgeType edge_type)
+        : Line(line), a_id(a_id), b_id(b_id), edge_a_id(edge_a_id), edge_b_id(edge_b_id), edge_type(edge_type) {}
     // Used to skip duplicate edges.
     enum {
         // Triangle edge added, because it has no neighbor.

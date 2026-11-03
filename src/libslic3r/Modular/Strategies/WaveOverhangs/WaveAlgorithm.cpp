@@ -586,13 +586,13 @@ void append_zig_zag_front_levels(ExtrusionPaths               &overhang_region,
 
         if (d_flip < d_keep)
             front.reverse();
-        coord_t curr_z = current.last_point().z();
+        coord_t curr_z = current.polyline.empty() ? 0 : current.polyline.points.back().z();
         if (curr_last == front.first_point()) {
             for (size_t i = 1; i < front.points.size(); ++i)
-                current.polyline.append(Point3(front.points[i].x(), front.points[i].y(), curr_z));
+                current.polyline.points.emplace_back(front.points[i].x(), front.points[i].y(), curr_z);
         } else {
             for (size_t i = 0; i < front.points.size(); ++i)
-                current.polyline.append(Point3(front.points[i].x(), front.points[i].y(), curr_z));
+                current.polyline.points.emplace_back(front.points[i].x(), front.points[i].y(), curr_z);
         }
     };
 

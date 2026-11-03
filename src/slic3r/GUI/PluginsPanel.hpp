@@ -7,17 +7,17 @@
 #include <wx/button.h>
 #include <wx/listctrl.h>
 #include <wx/checkbox.h>
-#include "slic3r/GUI/Widgets/LazyInstance.hpp"
+#include "slic3r/GUI/Lazy.hpp"
 
 namespace Slic3r::GUI {
 
-class PluginsPanel : public wxPanel, public StagedBuild, public LazyInstance<PluginsPanel>
+class PluginsPanel : public wxPanel, public LazyInstance<PluginsPanel>
 {
 public:
     PluginsPanel(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxTAB_TRAVERSAL);
     ~PluginsPanel() override = default;
 
-    void build() override;
+    void build();
     void refresh_catalog();
 
 private:

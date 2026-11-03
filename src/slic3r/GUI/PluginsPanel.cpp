@@ -3,9 +3,13 @@
 #include <wx/msgdlg.h>
 #include <wx/stdpaths.h>
 #include <wx/utils.h>
+#include <wx/dir.h>
+#include <wx/filename.h>
 #include "I18N.hpp"
+#include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
+#include "libslic3r/Utils.hpp"
 #include "libslic3r/Modular/ModuleManager.hpp"
 
 namespace Slic3r::GUI {
@@ -13,6 +17,7 @@ namespace Slic3r::GUI {
 PluginsPanel::PluginsPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : wxPanel(parent, id, pos, size, style)
 {
+    build();
 }
 
 void PluginsPanel::build()
@@ -138,7 +143,7 @@ void PluginsPanel::on_install_plugin(wxCommandEvent &)
 
 void PluginsPanel::on_open_plugins_dir(wxCommandEvent &)
 {
-    wxString dir = wxGetApp().app_config->get_data_dir() + wxFileName::GetPathSeparator() + "plugins";
+    wxString dir = from_u8(Slic3r::data_dir()) + wxFileName::GetPathSeparator() + "plugins";
     if (!wxDirExists(dir)) {
         wxMkdir(dir);
     }

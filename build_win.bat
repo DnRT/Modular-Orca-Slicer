@@ -593,8 +593,14 @@ REM runs one cl per core inside each one, so -j 1 would not give one
 REM compiler. CL_MPCount sets the /MP degree instead, and MSBuild reads
 REM properties from the environment, so nested deps builds inherit it. /m
 REM stays at its default of one project at a time.
+set "TrackFileAccess=false"
 set "JOBS_FLAG="
-if "%jobs%" == "" goto :jobs_ready
+if "%jobs%" == "" (
+    if "%using_ninja%" == "OFF" (
+        set "CL_MPCount=4"
+    )
+    goto :jobs_ready
+)
 echo %jobs%| findstr /r /c:"^[1-9][0-9]*$" >nul
 if errorlevel 1 (
     echo Invalid --jobs value "%jobs%". Expected a positive integer.
