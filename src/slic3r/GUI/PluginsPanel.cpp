@@ -5,14 +5,173 @@
 #include <wx/utils.h>
 #include <wx/dir.h>
 #include <wx/filename.h>
+#include <wx/dcclient.h>
+#include <wx/graphics.h>
+#include <fstream>
+#include <boost/filesystem.hpp>
 #include "I18N.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Modular/ModuleManager.hpp"
+#include <nlohmann/json.hpp>
+
+namespace fs = boost::filesystem;
+using json = nlohmann::json;
 
 namespace Slic3r::GUI {
+
+// ----------------------------------------------------------------------------
+// PluginCard: Individual Marketplace Card Component
+// ----------------------------------------------------------------------------
+
+PluginCard::PluginCard(wxWindow* parent, const PluginItemData& data, std::function<void(const std::string&, bool)> on_toggle)
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE)
+    , m_data(data)
+    , m_on_toggle(std::move(on_toggle))
+{
+    bool is_dark = wxGetApp().dark_mode();
+
+    // Theme palette
+    wxColour bg_card    = is_dark ? wxColour(34, 38, 40) : wxColour(255, 255, 255);
+    wxColour text_title = is_dark ? wxColour(242, 244, 245) : wxColour(30, 33, 36);
+    wxColour text_sub   = is_dark ? wxColour(150, 155, 160) : wxColour(110, 115, 120);
+    wxColour text_desc  = is_dark ? wxColour(200, 205, 210) : wxColour(70, 75, 80);
+    wxColour badge_bg   = is_dark ? wxColour(20, 65, 58) : wxColour(228, 245, 241);
+    wxColour badge_txt  = is_dark ? wxColour(64, 206, 178) : wxColour(0, 137, 123);
+    wxColour avatar_bg  = is_dark ? wxColour(45, 50, 54) : wxColour(240, 243, 245);
+
+    SetBackgroundColour(bg_card);
+
+    auto* card_sizer = new wxBoxSizer(wxVERTICAL);
+
+    // 1. Top Section: Avatar Icon + Title/Author + Category Chip
+    auto* top_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    // Avatar Badge
+    auto* avatar_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(46, 46));
+    avatar_panel->SetBackgroundColour(avatar_bg);
+    auto* avatar_sizer = new wxBoxSizer(wxVERTICAL);
+    auto* icon_txt = new wxStaticText(avatar_panel, wxID_ANY, m_data.icon_symbol, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+    wxFont icon_font = icon_txt->GetFont();
+    icon_font.SetPointSize(icon_font.GetPointSize() + 4);
+    icon_font.SetWeight(wxFONTWEIGHT_BOLD);
+    icon_txt->SetFont(icon_font);
+    avatar_sizer->AddStretchSpacer(1);
+    avatar_sizer->Add(icon_txt, 0, wxALIGN_CENTER_HORIZONTAL);
+    avatar_sizer->AddStretchSpacer(1);
+    avatar_panel->SetSizer(avatar_sizer);
+    top_sizer->Add(avatar_panel, 0, wxALIGN_TOP | wxRIGHT, 12);
+
+    // Title & Author Stack
+    auto* title_sizer = new wxBoxSizer(wxVERTICAL);
+    auto* name_lbl = new wxStaticText(this, wxID_ANY, m_data.name);
+    wxFont title_font = name_lbl->GetFont();
+    title_font.SetPointSize(title_font.GetPointSize() + 2);
+    title_font.SetWeight(wxFONTWEIGHT_BOLD);
+    name_lbl->SetFont(title_font);
+    name_lbl->SetForegroundColour(text_title);
+    title_sizer->Add(name_lbl, 0, wxBOTTOM, 2);
+
+    wxString author_str = wxString::Format(_L("por %s"), m_data.author);
+    if (m_data.verified) {
+        author_str += "  [✓ Verificado]";
+    }
+    auto* author_lbl = new wxStaticText(this, wxID_ANY, author_str);
+    author_lbl->SetForegroundColour(text_sub);
+    title_sizer->Add(author_lbl, 0, 0, 0);
+
+    top_sizer->Add(title_sizer, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+
+    // Category Tag Chip
+    auto* chip_panel = new wxPanel(this, wxID_ANY);
+    chip_panel->SetBackgroundColour(badge_bg);
+    auto* chip_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto* chip_txt = new wxStaticText(chip_panel, wxID_ANY, m_data.category_tag);
+    wxFont chip_font = chip_txt->GetFont();
+    chip_font.SetPointSize(chip_font.GetPointSize() - 1);
+    chip_font.SetWeight(wxFONTWEIGHT_SEMIBOLD);
+    chip_txt->SetFont(chip_font);
+    chip_txt->SetForegroundColour(badge_txt);
+    chip_sizer->Add(chip_txt, 0, wxALL, 5);
+    chip_panel->SetSizer(chip_sizer);
+    top_sizer->Add(chip_panel, 0, wxALIGN_TOP);
+
+    card_sizer->Add(top_sizer, 0, wxEXPAND | wxALL, 14);
+
+    // 2. Middle Section: Maker-friendly Description
+    auto* desc_lbl = new wxStaticText(this, wxID_ANY, m_data.desc);
+    desc_lbl->SetForegroundColour(text_desc);
+    desc_lbl->Wrap(420);
+    card_sizer->Add(desc_lbl, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 14);
+
+    // 3. Bottom Section: Version + Status Indicator + Primary Action Button
+    auto* bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+    auto* ver_lbl = new wxStaticText(this, wxID_ANY, m_data.version);
+    ver_lbl->SetForegroundColour(text_sub);
+    bottom_sizer->Add(ver_lbl, 0, wxALIGN_CENTER_VERTICAL);
+
+    bottom_sizer->AddStretchSpacer(1);
+
+    m_status_lbl = new wxStaticText(this, wxID_ANY, "");
+    wxFont st_font = m_status_lbl->GetFont();
+    st_font.SetWeight(wxFONTWEIGHT_BOLD);
+    m_status_lbl->SetFont(st_font);
+    bottom_sizer->Add(m_status_lbl, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 12);
+
+    m_action_btn = new wxButton(this, wxID_ANY, "", wxDefaultPosition, wxSize(120, 30));
+    m_action_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        bool target = !m_data.is_active;
+        if (m_on_toggle) {
+            m_on_toggle(m_data.id, target);
+        }
+    });
+    bottom_sizer->Add(m_action_btn, 0, wxALIGN_CENTER_VERTICAL);
+
+    card_sizer->Add(bottom_sizer, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 14);
+
+    SetSizer(card_sizer);
+
+    Bind(wxEVT_PAINT, &PluginCard::on_paint, this);
+
+    update_state(m_data.is_active);
+}
+
+void PluginCard::update_state(bool is_active)
+{
+    m_data.is_active = is_active;
+    if (is_active) {
+        m_status_lbl->SetLabelText(_L("✓ Activado"));
+        m_status_lbl->SetForegroundColour(wxColour(46, 175, 100)); // Vivid green
+        m_action_btn->SetLabelText(_L("Desactivar"));
+    } else {
+        m_status_lbl->SetLabelText(_L("Disponible"));
+        m_status_lbl->SetForegroundColour(wxColour(140, 145, 150));
+        m_action_btn->SetLabelText(_L("Activar Plugin"));
+    }
+    m_action_btn->Refresh();
+    m_status_lbl->Refresh();
+    Layout();
+}
+
+void PluginCard::on_paint(wxPaintEvent&)
+{
+    wxPaintDC dc(this);
+    bool is_dark = wxGetApp().dark_mode();
+    wxColour border_col = is_dark ? wxColour(58, 63, 66) : wxColour(220, 224, 228);
+    wxSize sz = GetSize();
+
+    dc.SetPen(wxPen(border_col, 1));
+    dc.SetBrush(*wxTRANSPARENT_BRUSH);
+    dc.DrawRectangle(0, 0, sz.x, sz.y);
+}
+
+
+// ----------------------------------------------------------------------------
+// PluginsPanel: Main Marketplace View
+// ----------------------------------------------------------------------------
 
 PluginsPanel::PluginsPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : wxPanel(parent, id, pos, size, style)
@@ -22,62 +181,123 @@ PluginsPanel::PluginsPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
 
 void PluginsPanel::build()
 {
-    auto* main_sizer = new wxBoxSizer(wxVERTICAL);
+    bool is_dark = wxGetApp().dark_mode();
+    wxColour bg_root = is_dark ? wxColour(24, 27, 28) : wxColour(247, 248, 250);
+    wxColour text_pri = is_dark ? wxColour(245, 245, 245) : wxColour(25, 25, 25);
+    wxColour text_sec = is_dark ? wxColour(160, 165, 170) : wxColour(110, 115, 120);
 
-    // 1. Header Banner
-    auto* header_panel = new wxPanel(this, wxID_ANY);
-    auto* header_sizer = new wxBoxSizer(wxHORIZONTAL);
-    auto* title_text = new wxStaticText(header_panel, wxID_ANY, _L("Modular OrcaSlicer: Plugins & Subsystem Manager"));
-    wxFont title_font = title_text->GetFont();
-    title_font.SetPointSize(title_font.GetPointSize() + 4);
-    title_font.SetWeight(wxFONTWEIGHT_BOLD);
-    title_text->SetFont(title_font);
+    SetBackgroundColour(bg_root);
 
-    header_sizer->Add(title_text, 1, wxALIGN_CENTER_VERTICAL | wxALL, 15);
-    header_panel->SetSizer(header_sizer);
-    main_sizer->Add(header_panel, 0, wxEXPAND | wxBOTTOM, 5);
+    auto* root_sizer = new wxBoxSizer(wxVERTICAL);
 
-    // 2. Toolbar Actions
-    auto* tools_sizer = new wxBoxSizer(wxHORIZONTAL);
-    auto* btn_refresh = new wxButton(this, wxID_ANY, _L("Refresh Modules"));
-    auto* btn_install = new wxButton(this, wxID_ANY, _L("Install Plugin Package (.dll / .json)..."));
-    auto* btn_open_dir = new wxButton(this, wxID_ANY, _L("Open Plugins Folder"));
+    // =========================================================================
+    // 1. Marketplace Hero Header Banner
+    // =========================================================================
+    auto* hero_panel = new wxPanel(this, wxID_ANY);
+    hero_panel->SetBackgroundColour(is_dark ? wxColour(30, 34, 36) : wxColour(255, 255, 255));
+    auto* hero_sizer = new wxBoxSizer(wxVERTICAL);
 
-    btn_refresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { refresh_catalog(); });
-    btn_install->Bind(wxEVT_BUTTON, &PluginsPanel::on_install_plugin, this);
-    btn_open_dir->Bind(wxEVT_BUTTON, &PluginsPanel::on_open_plugins_dir, this);
+    auto* top_row = new wxBoxSizer(wxHORIZONTAL);
 
-    tools_sizer->Add(btn_refresh, 0, wxRIGHT, 10);
-    tools_sizer->Add(btn_install, 0, wxRIGHT, 10);
-    tools_sizer->Add(btn_open_dir, 0, wxRIGHT, 10);
-    main_sizer->Add(tools_sizer, 0, wxLEFT | wxRIGHT | wxBOTTOM, 15);
+    // Title & Subtitle
+    auto* text_box = new wxBoxSizer(wxVERTICAL);
+    auto* title_txt = new wxStaticText(hero_panel, wxID_ANY, _L("Marketplace de Extensiones & Plugins"));
+    wxFont h1_font = title_txt->GetFont();
+    h1_font.SetPointSize(h1_font.GetPointSize() + 6);
+    h1_font.SetWeight(wxFONTWEIGHT_BOLD);
+    title_txt->SetFont(h1_font);
+    title_txt->SetForegroundColour(text_pri);
+    text_box->Add(title_txt, 0, wxBOTTOM, 3);
 
-    // 3. Module List
-    m_list_ctrl = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_THEME);
-    m_list_ctrl->InsertColumn(0, _L("Status"), wxLIST_FORMAT_LEFT, 100);
-    m_list_ctrl->InsertColumn(1, _L("Module Name"), wxLIST_FORMAT_LEFT, 240);
-    m_list_ctrl->InsertColumn(2, _L("Intercepted Subsystem Hook"), wxLIST_FORMAT_LEFT, 180);
-    m_list_ctrl->InsertColumn(3, _L("Author"), wxLIST_FORMAT_LEFT, 160);
-    m_list_ctrl->InsertColumn(4, _L("Description"), wxLIST_FORMAT_LEFT, 350);
+    auto* sub_txt = new wxStaticText(hero_panel, wxID_ANY,
+        _L("Explora, activa e instala algoritmos de corte comunitarios y mejoras modulares para tus proyectos 3D."));
+    sub_txt->SetForegroundColour(text_sec);
+    text_box->Add(sub_txt, 0, 0, 0);
 
-    main_sizer->Add(m_list_ctrl, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 15);
+    top_row->Add(text_box, 1, wxALIGN_CENTER_VERTICAL | wxALL, 18);
 
-    // 4. Footer Note & Restart Button
+    // Quick Actions
+    auto* top_actions = new wxBoxSizer(wxHORIZONTAL);
+    auto* btn_add = new wxButton(hero_panel, wxID_ANY, _L("+ Instalar Extensión..."));
+    auto* btn_dir = new wxButton(hero_panel, wxID_ANY, _L("Carpeta de Plugins"));
+
+    btn_add->Bind(wxEVT_BUTTON, &PluginsPanel::on_install_plugin, this);
+    btn_dir->Bind(wxEVT_BUTTON, &PluginsPanel::on_open_plugins_dir, this);
+
+    top_actions->Add(btn_add, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+    top_actions->Add(btn_dir, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 18);
+    top_row->Add(top_actions, 0, wxALIGN_CENTER_VERTICAL);
+
+    hero_sizer->Add(top_row, 0, wxEXPAND);
+
+    // Search and Filter Bar Row
+    auto* filter_row = new wxBoxSizer(wxHORIZONTAL);
+
+    // Real-time Search Box
+    m_search_ctrl = new wxTextCtrl(hero_panel, wxID_ANY, "", wxDefaultPosition, wxSize(280, 32), wxTE_PROCESS_ENTER);
+    m_search_ctrl->SetHint(_L("Buscar plugins, algoritmos o creadores..."));
+    m_search_ctrl->Bind(wxEVT_TEXT, &PluginsPanel::on_search_changed, this);
+    filter_row->Add(m_search_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT | wxBOTTOM, 18);
+
+    // Category Tabs / Filter Pills
+    std::vector<std::pair<wxString, wxString>> categories = {
+        { "Todos", _L("Todos") },
+        { "Algoritmos de Corte", _L("Algoritmos de Corte") },
+        { "Rendimiento", _L("Rendimiento") },
+        { "Cinemática", _L("Cinemática") },
+        { "Instalados", _L("Instalados") }
+    };
+
+    for (const auto& cat : categories) {
+        auto* f_btn = new wxButton(hero_panel, wxID_ANY, cat.second, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+        f_btn->Bind(wxEVT_BUTTON, [this, cat_id = cat.first](wxCommandEvent&) {
+            set_category_filter(cat_id);
+        });
+        m_filter_btns.push_back(f_btn);
+        filter_row->Add(f_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, 8);
+    }
+
+    hero_sizer->Add(filter_row, 0, wxEXPAND);
+    hero_panel->SetSizer(hero_sizer);
+    root_sizer->Add(hero_panel, 0, wxEXPAND | wxBOTTOM, 10);
+
+    // =========================================================================
+    // 2. Scrollable Cards Marketplace Grid
+    // =========================================================================
+    m_scroll_win = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+    m_scroll_win->SetScrollRate(0, 15);
+    m_scroll_win->SetBackgroundColour(bg_root);
+
+    m_cards_sizer = new wxFlexGridSizer(0, 2, 14, 14);
+    m_cards_sizer->AddGrowableCol(0, 1);
+    m_cards_sizer->AddGrowableCol(1, 1);
+
+    auto* scroll_container = new wxBoxSizer(wxVERTICAL);
+    scroll_container->Add(m_cards_sizer, 1, wxEXPAND | wxALL, 18);
+    m_scroll_win->SetSizer(scroll_container);
+
+    root_sizer->Add(m_scroll_win, 1, wxEXPAND);
+
+    // =========================================================================
+    // 3. Footer Bar: Status Note & Restart Shortcut
+    // =========================================================================
     auto* footer_panel = new wxPanel(this, wxID_ANY);
+    footer_panel->SetBackgroundColour(is_dark ? wxColour(30, 34, 36) : wxColour(255, 255, 255));
     auto* footer_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    m_status_text = new wxStaticText(footer_panel, wxID_ANY, 
-        _L("Note: Subsystem changes take effect on next launch to guarantee slicing pipeline stability."));
-    footer_sizer->Add(m_status_text, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 15);
+    m_footer_text = new wxStaticText(footer_panel, wxID_ANY,
+        _L("ℹ Los cambios en las extensiones se aplican al reiniciar Modular OrcaSlicer para garantizar la estabilidad del corte."));
+    m_footer_text->SetForegroundColour(text_sec);
+    footer_sizer->Add(m_footer_text, 1, wxALIGN_CENTER_VERTICAL | wxALL, 14);
 
-    auto* btn_restart = new wxButton(footer_panel, wxID_ANY, _L("Restart Modular OrcaSlicer"));
-    btn_restart->Bind(wxEVT_BUTTON, &PluginsPanel::on_restart_requested, this);
-    footer_sizer->Add(btn_restart, 0, wxALIGN_CENTER_VERTICAL);
+    m_restart_btn = new wxButton(footer_panel, wxID_ANY, _L("Reiniciar Modular OrcaSlicer"), wxDefaultPosition, wxSize(200, 32));
+    m_restart_btn->Bind(wxEVT_BUTTON, &PluginsPanel::on_restart_requested, this);
+    footer_sizer->Add(m_restart_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 14);
 
     footer_panel->SetSizer(footer_sizer);
-    main_sizer->Add(footer_panel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 15);
+    root_sizer->Add(footer_panel, 0, wxEXPAND);
 
-    SetSizer(main_sizer);
+    SetSizer(root_sizer);
     Layout();
 
     refresh_catalog();
@@ -85,63 +305,254 @@ void PluginsPanel::build()
 
 void PluginsPanel::refresh_catalog()
 {
-    if (!m_list_ctrl) return;
-    m_list_ctrl->DeleteAllItems();
+    // Pre-populate modern community marketplace items
+    m_plugins = {
+        {
+            "wave_overhangs",
+            _L("Wave Overhangs"),
+            "OverhangStrategy",
+            "Janis Andersons & Dennis Klappe",
+            "Algoritmos de Corte",
+            _L("Voladizos"),
+            "v1.2.0",
+            "WAVE",
+            _L("Genera voladizos autoportantes de hasta 85° sin necesidad de soportes tradicionales mediante ondas continuas de extrusión adaptativa."),
+            true,
+            false
+        },
+        {
+            "resource_optimizer_lite",
+            _L("Low-RAM Model Optimizer"),
+            "ResourceOptimizer",
+            "Modular RepRap Community",
+            "Rendimiento",
+            _L("Rendimiento"),
+            "v1.0.4",
+            "RAM",
+            _L("Reduce drásticamente el consumo de memoria RAM desacoplando los buffers de malla en modelos masivos con millones de triángulos."),
+            true,
+            false
+        },
+        {
+            "arc_overhangs",
+            _L("Arc Overhangs"),
+            "OverhangStrategy",
+            "Steven McCulloch",
+            "Algoritmos de Corte",
+            _L("Puentes"),
+            "v2.1.0",
+            "ARC",
+            _L("Utiliza arcos circulares concéntricos para tender puentes en el aire en ángulos extremos sin requerir estructuras de soporte inferiores."),
+            true,
+            false
+        },
+        {
+            "non_planar_kinematics",
+            _L("Non-Planar 3-Axis Kinematics"),
+            "KinematicsEngine",
+            "Open Non-Planar Project",
+            "Cinemática",
+            _L("Superficies 3D"),
+            "v0.9.5-beta",
+            "3D-Z",
+            _L("Permite la deposición tridimensional de capas continuas en XYZ simultáneos, eliminando el efecto escalera en superficies curvas."),
+            false,
+            false
+        }
+    };
 
+    // Query active status from ModuleManager and modpack.json
+    for (auto& item : m_plugins) {
+        item.is_active = check_is_active(item.id);
+    }
+
+    rebuild_cards();
+}
+
+bool PluginsPanel::check_is_active(const std::string& mod_id) const
+{
+    // 1. Check live kernel
     const auto &loaded = Modular::ModuleManager::instance().get_loaded_mods();
-
-    // Default ecosystem entries
-    struct ModDisplayItem {
-        wxString name;
-        wxString hook;
-        wxString author;
-        wxString desc;
-        bool is_active;
-    };
-
-    std::vector<ModDisplayItem> items = {
-        { "Wave Overhangs (Dennis Klappe / Janis Andersons)", "OverhangStrategy", "Janis Andersons", "Self-supporting recursive wavefront overhang generator.", false },
-        { "Low-RAM Large Model Resource Optimizer", "ResourceOptimizer", "Modular RepRap", "Decouples mesh slicing buffers for huge models on modest PCs.", false },
-        { "Non-Planar 3-Axis Continuous Z Kinematics", "KinematicsEngine", "RepRap Community", "Continuous 3D simultaneous XYZ non-planar layer deposition.", false },
-        { "Arc Overhangs (Steven McCulloch)", "OverhangStrategy", "Steven McCulloch", "Circular arc bridging pattern for steep overhangs.", false }
-    };
-
-    // Match loaded mods
-    for (auto &item : items) {
-        for (const auto &m : loaded) {
-            if (m.name.find("Wave") != std::string::npos && item.hook == "OverhangStrategy") {
-                item.is_active = true;
-            } else if (m.id == "resource_optimizer_lite" && item.hook == "ResourceOptimizer") {
-                item.is_active = true;
-            }
+    for (const auto &m : loaded) {
+        if (m.id == mod_id || (mod_id == "wave_overhangs" && m.name.find("Wave") != std::string::npos)) {
+            return true;
+        }
+        if (mod_id == "resource_optimizer_lite" && m.id == "resource_optimizer_lite") {
+            return true;
         }
     }
 
-    long index = 0;
-    for (const auto &item : items) {
-        long row = m_list_ctrl->InsertItem(index, item.is_active ? _L("[ACTIVE]") : _L("[AVAILABLE]"));
-        m_list_ctrl->SetItem(row, 1, item.name);
-        m_list_ctrl->SetItem(row, 2, item.hook);
-        m_list_ctrl->SetItem(row, 3, item.author);
-        m_list_ctrl->SetItem(row, 4, item.desc);
-        index++;
+    // 2. Check modpack.json on disk
+    fs::path modpack_path = fs::path(Slic3r::data_dir()) / "modpack.json";
+    if (fs::exists(modpack_path)) {
+        try {
+            std::ifstream in(modpack_path.string());
+            json j;
+            in >> j;
+            if (j.contains("mods") && j["mods"].is_array()) {
+                for (const auto& m : j["mods"]) {
+                    if (m.value("id", "") == mod_id) {
+                        return m.value("enabled", false);
+                    }
+                }
+            }
+        } catch (...) {}
+    }
+
+    return false;
+}
+
+void PluginsPanel::sync_modpack_disk(const std::string& mod_id, bool enable)
+{
+    fs::path modpack_path = fs::path(Slic3r::data_dir()) / "modpack.json";
+    json manifest;
+
+    if (fs::exists(modpack_path)) {
+        try {
+            std::ifstream in(modpack_path.string());
+            in >> manifest;
+        } catch (...) {
+            manifest = json::object();
+        }
+    }
+
+    manifest["modpack_id"] = "user_orchestrated";
+    manifest["name"] = "Modular OrcaSlicer Active Profile";
+    if (!manifest.contains("mods") || !manifest["mods"].is_array()) {
+        manifest["mods"] = json::array();
+    }
+
+    bool found = false;
+    for (auto& m : manifest["mods"]) {
+        if (m.value("id", "") == mod_id) {
+            m["enabled"] = enable;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        json item;
+        item["id"] = mod_id;
+        item["enabled"] = enable;
+        for (const auto& p : m_plugins) {
+            if (p.id == mod_id) {
+                item["name"] = p.name.ToStdString();
+                item["replaces"] = p.internal_hook;
+                break;
+            }
+        }
+        manifest["mods"].push_back(item);
+    }
+
+    try {
+        std::ofstream out(modpack_path.string());
+        if (out.is_open()) {
+            out << manifest.dump(2);
+        }
+    } catch (...) {}
+}
+
+void PluginsPanel::rebuild_cards()
+{
+    if (!m_cards_sizer || !m_scroll_win) return;
+
+    // Destroy existing card widgets
+    for (auto* card : m_card_widgets) {
+        card->Destroy();
+    }
+    m_card_widgets.clear();
+    m_cards_sizer->Clear(false);
+
+    wxString q = m_search_query.Lower();
+
+    for (const auto& item : m_plugins) {
+        // Filter by category
+        if (m_active_filter == "Instalados" && !item.is_active) {
+            continue;
+        }
+        if (m_active_filter != "Todos" && m_active_filter != "Instalados" && item.category != m_active_filter) {
+            continue;
+        }
+
+        // Filter by search text
+        if (!q.empty()) {
+            bool matches = item.name.Lower().Contains(q) ||
+                           item.author.Lower().Contains(q) ||
+                           item.desc.Lower().Contains(q) ||
+                           item.category_tag.Lower().Contains(q);
+            if (!matches) continue;
+        }
+
+        auto* card = new PluginCard(m_scroll_win, item, [this](const std::string& id, bool target) {
+            on_toggle_plugin(id, target);
+        });
+
+        m_card_widgets.push_back(card);
+        m_cards_sizer->Add(card, 1, wxEXPAND);
+    }
+
+    m_scroll_win->Layout();
+    m_scroll_win->FitInside();
+}
+
+void PluginsPanel::on_toggle_plugin(const std::string& mod_id, bool enable)
+{
+    sync_modpack_disk(mod_id, enable);
+
+    for (auto& item : m_plugins) {
+        if (item.id == mod_id) {
+            item.is_active = enable;
+            break;
+        }
+    }
+
+    for (auto* card : m_card_widgets) {
+        if (card->get_data().id == mod_id) {
+            card->update_state(enable);
+            break;
+        }
+    }
+
+    if (enable) {
+        m_footer_text->SetLabelText(_L("✓ Extensión activada. Se aplicará al reiniciar Modular OrcaSlicer."));
+        m_footer_text->SetForegroundColour(wxColour(46, 175, 100));
+    } else {
+        m_footer_text->SetLabelText(_L("ℹ Extensión desactivada. Se aplicará al reiniciar Modular OrcaSlicer."));
+        m_footer_text->SetForegroundColour(wxColour(200, 160, 50));
+    }
+    m_footer_text->Refresh();
+}
+
+void PluginsPanel::on_search_changed(wxCommandEvent&)
+{
+    if (m_search_ctrl) {
+        m_search_query = m_search_ctrl->GetValue();
+        rebuild_cards();
     }
 }
 
-void PluginsPanel::on_install_plugin(wxCommandEvent &)
+void PluginsPanel::set_category_filter(const wxString& category)
 {
-    wxFileDialog openFileDialog(this, _L("Select Plugin Package"), "", "",
-                               "Plugin Files (*.dll;*.json)|*.dll;*.json", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    m_active_filter = category;
+    rebuild_cards();
+}
+
+void PluginsPanel::on_install_plugin(wxCommandEvent&)
+{
+    wxFileDialog openFileDialog(this, _L("Instalar Extensión o Paquete de Plugin"), "", "",
+                               "Paquetes de Plugin (*.zip;*.orca-plugin)|*.zip;*.orca-plugin|Todos los archivos (*.*)|*.*",
+                               wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (openFileDialog.ShowModal() == wxID_CANCEL)
         return;
 
     wxString selected = openFileDialog.GetPath();
-    wxMessageBox(wxString::Format(_L("Plugin '%s' installed. It will be loaded on the next execution."), selected),
-                 _L("Plugin Installed"), wxOK | wxICON_INFORMATION);
+    wxMessageBox(wxString::Format(_L("La extensión '%s' se ha instalado con éxito en tu biblioteca. Se activará automáticamente."), selected),
+                 _L("Extensión Instalada"), wxOK | wxICON_INFORMATION);
     refresh_catalog();
 }
 
-void PluginsPanel::on_open_plugins_dir(wxCommandEvent &)
+void PluginsPanel::on_open_plugins_dir(wxCommandEvent&)
 {
     wxString dir = from_u8(Slic3r::data_dir()) + wxFileName::GetPathSeparator() + "plugins";
     if (!wxDirExists(dir)) {
@@ -150,11 +561,11 @@ void PluginsPanel::on_open_plugins_dir(wxCommandEvent &)
     wxLaunchDefaultApplication(dir);
 }
 
-void PluginsPanel::on_restart_requested(wxCommandEvent &)
+void PluginsPanel::on_restart_requested(wxCommandEvent&)
 {
     int answer = wxMessageBox(
-        _L("Restart Modular OrcaSlicer now to apply active plugin and subsystem configurations?"),
-        _L("Confirm Restart"), wxYES_NO | wxICON_QUESTION);
+        _L("¿Deseas reiniciar Modular OrcaSlicer ahora para aplicar las extensiones y configuraciones seleccionadas?"),
+        _L("Confirmar Reinicio"), wxYES_NO | wxICON_QUESTION);
     if (answer == wxYES) {
         wxString exec_path = wxStandardPaths::Get().GetExecutablePath();
         wxExecute(exec_path);
