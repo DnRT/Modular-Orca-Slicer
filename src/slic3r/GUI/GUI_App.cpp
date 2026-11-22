@@ -50,6 +50,7 @@
 #include <filesystem>
 #include <ctime>
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Modular/ModuleManager.hpp"
 #include <ios>
 #include <chrono>
 #include <functional>
@@ -2797,6 +2798,10 @@ void GUI_App::init_app_config()
     } else {
         m_datadir_redefined = true;
     }
+
+    try {
+        Slic3r::Modular::ModuleManager::instance().auto_configure_from_datadir(data_dir());
+    } catch (...) {}
 
     // start log here
     std::time_t       t        = std::time(0);

@@ -1,5 +1,6 @@
 #include "OverhangStrategyRegistry.hpp"
 #include "Strategies/WaveOverhangs/WaveOverhangStrategy.hpp"
+#include "Strategies/ArcOverhangs/ArcOverhangStrategy.hpp"
 
 namespace Slic3r::Modular {
 
@@ -9,8 +10,9 @@ OverhangStrategyRegistry& OverhangStrategyRegistry::instance() {
 }
 
 OverhangStrategyRegistry::OverhangStrategyRegistry() {
-    // Automatically register Wave Overhangs strategy as built-in modular strategy
+    // Automatically register built-in community modular strategies
     register_strategy(std::make_shared<WaveOverhangStrategy>());
+    register_strategy(std::make_shared<ArcOverhangStrategy>());
 }
 
 void OverhangStrategyRegistry::register_strategy(std::shared_ptr<IOverhangStrategy> strategy) {

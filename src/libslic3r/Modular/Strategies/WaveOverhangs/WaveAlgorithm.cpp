@@ -427,8 +427,10 @@ static bool should_generate_waves_for_region(const Polygons &overhang_to_cover,
 void tag_wave_overhang_paths(std::vector<ExtrusionPaths> &wave_paths)
 {
     for (ExtrusionPaths &region : wave_paths)
-        for (ExtrusionPath &path : region)
+        for (ExtrusionPath &path : region) {
+            path.wave_overhang = true;
             Modular::set_flag(path.strategy_flags, Modular::FLAG_WAVE_OVERHANG);
+        }
 }
 
 // Helper: construct an ExtrusionPath from a polyline + flow/role (Orca API).

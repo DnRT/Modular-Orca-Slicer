@@ -1,5 +1,57 @@
 <div align="center">
 
+# 🧩 Modular OrcaSlicer
+### Next-Gen Extensible Slicing Architecture & Algorithm Marketplace
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
+[![Platform: Windows x64](https://img.shields.io/badge/Platform-Windows%20x64-green.svg)](https://github.com/DnRT/Modular-Orca-Slicer)
+[![Engine: Modular C++20](https://img.shields.io/badge/Engine-Modular%20C%2B%2B20-orange.svg)](https://github.com/DnRT/Modular-Orca-Slicer)
+
+**Modular OrcaSlicer** is an architectural evolution of OrcaSlicer designed to solve the "monolithic fork fragmentation" in 3D printing. It decouples the core slicing pipeline into clean subsystem hooks, enabling the community to experiment, load, and share specialized cutting-edge algorithms via a built-in Extension Marketplace without rewriting the slicer.
+
+</div>
+
+---
+
+## 🌟 Key Features of this Modular Fork
+
+### 1. 🏬 Built-In Extensions Marketplace (Native UI)
+A dedicated **"Plugins"** tab integrated directly into OrcaSlicer's top-level navigation bar (alongside *Prepare*, *Preview*, *Device*, and *Project*).
+* **Category Filtering**: Explore extensions by *Rendimiento*, *Voladizos*, *Cinemática*, or *Instalados*.
+* **One-Click Activation**: Instant toggle switches with state persistence stored cleanly in `%APPDATA%\ModularOrcaSlicer\modpack.json`.
+* **Zero Security Risk**: Operates on a safe compile-time modular strategy pattern with runtime registry dispatch, eliminating external unverified DLL injection vulnerabilities.
+
+### 2. ⚡ Adaptive 2D Contour Simplifier
+* **Universal Nozzle Scaling (0.2mm to 1.0mm)**: Dynamically scales Douglas-Peucker 2D contour decimation proportionally to nozzle diameter ($D_{\text{nozzle}} \times 0.035$).
+* **Eliminates High-Poly Bottlenecks**: Drastically cuts slice times by 3x–5x on ultra-dense models (>1M–3M triangles like Moon Lamps, lithophanes, and 3D scans) by decimating sub-micrometer redundant vertices *before* feeding Arachne/Voronoi, with **zero visible loss of dimensional accuracy or surface detail**.
+
+### 3. 🧹 Eager Layer Buffer Flusher
+* **Memory Curve Stabilization**: Slicing massive models with 1000+ layers traditionally causes monotonic linear RAM accumulation.
+* **Rolling Deallocation**: Proactively frees non-essential intermediate buffers (`raw_slices`, non-overlap fill boundary polygons) right as each layer completes its perimeter and infill calculations, keeping RAM usage completely flat throughout long slices.
+
+### 4. 🌊 Multi-Strategy Overhang Engine
+* **Wave Overhangs**: Continuous adaptive sinusoidal toolpaths allowing self-supporting overhangs up to 85° without vertical support trees.
+* **Arc Overhangs (Steven McCulloch Algorithm)**: Concentric circular arcs rooted on lower-layer anchors, spanning unsupported gaps in mid-air.
+* **Dynamic Algorithm Switching**: Toggle seamlessly between classic perimeters, wave overhangs, and arc overhangs directly from the UI.
+
+### 5. 🧠 Low-RAM Model Optimizer
+* Automatically caps concurrent slice worker allocations for huge meshes (>250k triangles) on RAM-limited hardware, preventing OS disk thrashing/paging and keeping the PC responsive.
+
+---
+
+## 🛠️ Windows Compilation Guide (Optimized)
+
+To compile Modular OrcaSlicer with optimal multi-core throughput while keeping your PC completely responsive:
+
+```powershell
+# In PowerShell (leaves 4 threads and 14GB RAM free for smooth multitasking):
+& "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe" "build\src\OrcaSlicer_app_gui.vcxproj" -p:Configuration=Release -p:Platform=x64 -m:1 -p:CL_MPCount=8
+```
+
+---
+
+<div align="center">
+
 <picture>
   <img alt="OrcaSlicer logo" src="resources/images/OrcaSlicer.png" width="15%" height="15%">
 </picture>

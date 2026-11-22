@@ -13,6 +13,7 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
+#include "Tab.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Modular/ModuleManager.hpp"
 #include <nlohmann/json.hpp>
@@ -358,6 +359,45 @@ void PluginsPanel::refresh_catalog()
             _L("Permite la deposición tridimensional de capas continuas en XYZ simultáneos, eliminando el efecto escalera en superficies curvas."),
             false,
             false
+        },
+        {
+            "modular_infill_walls",
+            _L("Algorithmic Walls & Infill"),
+            "InfillPattern",
+            "Modular RepRap Community",
+            "Algoritmos de Corte",
+            _L("Paredes y Relleno"),
+            "v1.0.0",
+            "WALL",
+            _L("Optimiza trayectorias de paredes y relleno con amortiguación adaptativa para evitar rozaduras de boquilla."),
+            true,
+            false
+        },
+        {
+            "adaptive_2d_simplifier",
+            _L("Adaptive 2D Simplifier"),
+            "ResourceOptimizer",
+            "Modular RepRap Community",
+            "Rendimiento",
+            _L("Geometría 2D"),
+            "v1.0.0",
+            "DECIM",
+            _L("Simplificación poligonal 2D adaptativa escalada a cualquier diámetro de boquilla (0.2 a 1.0mm). Acelera drásticamente el cálculo de paredes Arachne en piezas complejas."),
+            true,
+            false
+        },
+        {
+            "eager_layer_flusher",
+            _L("Eager Layer Flusher"),
+            "ResourceOptimizer",
+            "Modular RepRap Community",
+            "Rendimiento",
+            _L("Memoria RAM"),
+            "v1.0.0",
+            "FLUSH",
+            _L("Libera activamente búferes intermedios de capas al completar perímetros y relleno, estabilizando el consumo de RAM en modelos con cientos de capas (0.2 a 1.0mm)."),
+            true,
+            false
         }
     };
 
@@ -499,6 +539,7 @@ void PluginsPanel::rebuild_cards()
 void PluginsPanel::on_toggle_plugin(const std::string& mod_id, bool enable)
 {
     sync_modpack_disk(mod_id, enable);
+    Modular::ModuleManager::instance().set_plugin_active(mod_id, enable);
 
     for (auto& item : m_plugins) {
         if (item.id == mod_id) {
@@ -522,6 +563,12 @@ void PluginsPanel::on_toggle_plugin(const std::string& mod_id, bool enable)
         m_footer_text->SetForegroundColour(wxColour(200, 160, 50));
     }
     m_footer_text->Refresh();
+
+    try {
+        if (Tab* print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT)) {
+            print_tab->update_visibility();
+        }
+    } catch (...) {}
 }
 
 void PluginsPanel::on_search_changed(wxCommandEvent&)
@@ -540,15 +587,9 @@ void PluginsPanel::set_category_filter(const wxString& category)
 
 void PluginsPanel::on_install_plugin(wxCommandEvent&)
 {
-    wxFileDialog openFileDialog(this, _L("Instalar Extensión o Paquete de Plugin"), "", "",
-                               "Paquetes de Plugin (*.zip;*.orca-plugin)|*.zip;*.orca-plugin|Todos los archivos (*.*)|*.*",
-                               wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-    if (openFileDialog.ShowModal() == wxID_CANCEL)
-        return;
-
-    wxString selected = openFileDialog.GetPath();
-    wxMessageBox(wxString::Format(_L("La extensión '%s' se ha instalado con éxito en tu biblioteca. Se activará automáticamente."), selected),
-                 _L("Extensión Instalada"), wxOK | wxICON_INFORMATION);
+    wxMessageBox(
+        _L("Modular OrcaSlicer integra todos los módulos y algoritmos avanzados nativamente en el motor de corte para máxima resiliencia, estabilidad y ciberseguridad, eliminando la inyección de DLLs externas no verificadas.\n\nPuedes activar o desactivar cada módulo con los botones de este panel y seleccionar el algoritmo deseado para cada laminado en la configuración de proceso."),
+        _L("Gestor de Módulos Nativos"), wxOK | wxICON_INFORMATION);
     refresh_catalog();
 }
 
@@ -568,7 +609,7 @@ void PluginsPanel::on_restart_requested(wxCommandEvent&)
         _L("Confirmar Reinicio"), wxYES_NO | wxICON_QUESTION);
     if (answer == wxYES) {
         wxString exec_path = wxStandardPaths::Get().GetExecutablePath();
-        wxExecute(exec_path);
+        wxExecute("\"" + exec_path + "\"");
         if (wxGetApp().mainframe) {
             wxGetApp().mainframe->Close();
         }

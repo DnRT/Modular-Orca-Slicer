@@ -23,6 +23,8 @@ class TabCtrl : public StaticBox
     wxBoxSizer* sizer   = nullptr;
 
     int sel = -1;
+    int m_first_visible = 0;
+    bool m_in_relayout = false;
     wxFont bold;
 
 public:
@@ -86,6 +88,7 @@ private:
 
     void buttonClicked(wxCommandEvent& event);
     void keyDown(wxKeyEvent& event);
+    void mouseWheel(wxMouseEvent& event);
 
     void doRender(wxDC& dc) override;
 

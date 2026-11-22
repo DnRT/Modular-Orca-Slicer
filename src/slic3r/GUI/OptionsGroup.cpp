@@ -1144,6 +1144,11 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
     case coPercents:
     case coFloats:
     case coFloat: {
+        if (!config.has(opt_key)) {
+            double val = (opt && opt->default_value) ? opt->default_value->getFloat() : 0.0;
+            ret        = double_to_string(val);
+            break;
+        }
         if (opt_key == "extruder_printable_height") {
             auto opt_values = dynamic_cast<const ConfigOptionFloatsNullable*>(config.option(opt_key))->values;
             if (!opt_values.empty()) {
@@ -1179,10 +1184,34 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
         } else
             ret = from_u8(config.opt_string(opt_key, static_cast<unsigned int>(idx)));
         break;
-    case coBool: ret = config.opt_bool(opt_key); break;
-    case coBools: ret = config.opt_bool(opt_key, idx); break;
-    case coInt: ret = config.opt_int(opt_key); break;
-    case coInts: ret = config.opt_int(opt_key, idx); break;
+    case coBool:
+        if (!config.has(opt_key)) {
+            ret = (opt && opt->default_value) ? opt->default_value->getBool() : false;
+            break;
+        }
+        ret = config.opt_bool(opt_key);
+        break;
+    case coBools:
+        if (!config.has(opt_key)) {
+            ret = false;
+            break;
+        }
+        ret = config.opt_bool(opt_key, idx);
+        break;
+    case coInt:
+        if (!config.has(opt_key)) {
+            ret = (opt && opt->default_value) ? opt->default_value->getInt() : 0;
+            break;
+        }
+        ret = config.opt_int(opt_key);
+        break;
+    case coInts:
+        if (!config.has(opt_key)) {
+            ret = 0;
+            break;
+        }
+        ret = config.opt_int(opt_key, idx);
+        break;
     case coEnum:
         if (!config.has("first_layer_sequence_choice") && opt_key == "first_layer_sequence_choice") {
             // reset to Auto value
@@ -1198,6 +1227,10 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
             // reset to global value
             DynamicConfig& global_cfg = wxGetApp().preset_bundle->project_config;
             ret                       = global_cfg.option("curr_bed_type")->getInt();
+            break;
+        }
+        if (!config.has(opt_key) || !config.option(opt_key)) {
+            ret = (opt && opt->default_value) ? opt->default_value->getInt() : 0;
             break;
         }
         ret = config.option(opt_key)->getInt();
@@ -1309,11 +1342,11 @@ boost::any ConfigOptionsGroup::get_config_value2(const DynamicPrintConfig& confi
         } else
             ret = config.opt_string(opt_key, static_cast<unsigned int>(idx));
         break;
-    case coBool: ret = config.opt_bool(opt_key); break;
-    case coBools: ret = static_cast<unsigned char>(config.opt_bool(opt_key, idx)); break;
-    case coInt: ret = config.opt_int(opt_key); break;
-    case coInts: ret = config.opt_int(opt_key, idx); break;
-    case coEnum: ret = config.option(opt_key)->getInt(); break;
+    case coBool: ret = config.has(opt_key) ? config.opt_bool(opt_key) : ((opt && opt->default_value) ? opt->default_value->getBool() : false); break;
+    case coBools: ret = config.has(opt_key) ? static_cast<unsigned char>(config.opt_bool(opt_key, idx)) : 0; break;
+    case coInt: ret = config.has(opt_key) ? config.opt_int(opt_key) : ((opt && opt->default_value) ? opt->default_value->getInt() : 0); break;
+    case coInts: ret = config.has(opt_key) ? config.opt_int(opt_key, idx) : 0; break;
+    case coEnum: ret = (config.has(opt_key) && config.option(opt_key)) ? config.option(opt_key)->getInt() : ((opt && opt->default_value) ? opt->default_value->getInt() : 0); break;
     case coEnums: ret = config.opt_int(opt_key, idx); break;
     case coPoint: ret = config.option<ConfigOptionPoint>(opt_key)->value; break;
     case coPoints:

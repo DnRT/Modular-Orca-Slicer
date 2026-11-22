@@ -34,6 +34,13 @@ set(lisbslic3r_sources
     Modular/IOverhangStrategy.hpp
     Modular/OverhangStrategyRegistry.hpp
     Modular/OverhangStrategyRegistry.cpp
+    Modular/Strategies/ResourceOptimizer/IResourceOptimizer.hpp
+    Modular/Strategies/ResourceOptimizer/ResourceOptimizerMod.hpp
+    Modular/Strategies/AdaptiveSimplifier/Adaptive2DSimplifierMod.hpp
+    Modular/Strategies/LayerFlusher/EagerLayerFlusherMod.hpp
+    Modular/Strategies/ArcOverhangs/ArcOverhangStrategy.hpp
+    Modular/Strategies/WallInfill/IWallInfillStrategy.hpp
+    Modular/Strategies/WallInfill/WallInfillMod.hpp
     Modular/Strategies/WaveOverhangs/WaveAlgorithm.hpp
     Modular/Strategies/WaveOverhangs/WaveAlgorithm.cpp
     Modular/Strategies/WaveOverhangs/WaveOverhangStrategy.hpp

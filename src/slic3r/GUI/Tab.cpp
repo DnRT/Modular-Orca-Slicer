@@ -48,6 +48,7 @@
 #include <exception>
 #include <stdexcept>
 #include "libslic3r/LifecycleEvents.hpp"
+#include "libslic3r/Modular/ModuleManager.hpp"
 #include "libslic3r/Point.hpp"
 #include "slic3r/GUI/SettingsIndex.hpp"
 #include "slic3r/GUI/DeviceCore/DevDefs.h"
@@ -3152,6 +3153,66 @@ void TabPrint::build()
         optgroup->append_single_option_line("overhang_reverse_internal_only", "quality_settings_overhangs#reverse-internal-only");
         optgroup->append_single_option_line("overhang_reverse_threshold", "quality_settings_overhangs#reverse-threshold");
 
+    // Dedicated space for Modular Plugin: Wave Overhangs
+
+        page = add_options_page(L("Wave Overhangs"), "custom-gcode_quality");
+        optgroup = page->new_optgroup(L("General"), L"param_overhang");
+        optgroup->append_single_option_line("wave_overhangs");
+        optgroup->append_single_option_line("wave_overhangs_instead_of_bridges");
+        optgroup->append_single_option_line("wave_overhang_algorithm");
+        optgroup->append_single_option_line("support_remaining_areas_after_wave_overhangs");
+
+        optgroup = page->new_optgroup(L("Detection"), L"param_overhang");
+        optgroup->append_single_option_line("wave_overhang_min_length");
+        optgroup->append_single_option_line("wave_overhang_max_iterations");
+
+        // Pattern: how the wave is shaped.
+        optgroup = page->new_optgroup(L("Pattern"), L"param_overhang");
+        optgroup->append_single_option_line("wave_overhang_pattern");
+        optgroup->append_single_option_line("wave_overhang_seam_mode");
+        optgroup->append_single_option_line("wave_overhang_outer_perimeters");
+        optgroup->append_single_option_line("wave_overhang_line_spacing");
+        optgroup->append_single_option_line("wave_overhang_spacing_mode");
+        optgroup->append_single_option_line("wave_overhang_perimeter_overlap");
+        optgroup->append_single_option_line("wave_overhang_minimum_width");
+        optgroup->append_single_option_line("wave_overhang_min_new_area");
+        optgroup->append_single_option_line("wave_overhang_flow_mm3_per_mm");
+
+        // Corner reinforcement: opt-in feature.
+        optgroup = page->new_optgroup(L("Corner reinforcement"), L"param_overhang");
+        optgroup->append_single_option_line("wave_overhang_corner_taper_enable");
+        optgroup->append_single_option_line("wave_overhang_line_spacing_corner");
+        optgroup->append_single_option_line("wave_overhang_corner_taper_distance");
+        optgroup->append_single_option_line("wave_overhang_corner_angle_threshold");
+
+        optgroup = page->new_optgroup(L("Motion"), L"param_speed");
+        optgroup->append_single_option_line("wave_overhang_print_speed");
+        optgroup->append_single_option_line("wave_overhang_perimeter_speed");
+        optgroup->append_single_option_line("wave_overhang_travel_speed");
+        optgroup->append_single_option_line("wave_overhang_end_retract_length");
+
+        optgroup = page->new_optgroup(L("Cooling"), L"param_cooling_part_fan");
+        optgroup->append_single_option_line("wave_overhang_fan_speed");
+        optgroup->append_single_option_line("wave_overhang_aux_fan_speed");
+        optgroup->append_single_option_line("wave_overhang_nozzle_temp");
+        optgroup->append_single_option_line("wave_overhang_min_wave_time");
+        optgroup->append_single_option_line("wave_overhang_min_layer_time");
+
+        // Floor layers: solid surfaces printed directly on top of the wave.
+        optgroup = page->new_optgroup(L("Floor layers"), L"param_ironing");
+        optgroup->append_single_option_line("wave_overhang_floor_layers");
+        optgroup->append_single_option_line("wave_overhang_floor_print_speed");
+        optgroup->append_single_option_line("wave_overhang_floor_perimeter_speed");
+        optgroup->append_single_option_line("wave_overhang_floor_speed_ramp");
+        optgroup->append_single_option_line("wave_overhang_floor_fan_speed");
+        optgroup->append_single_option_line("wave_overhang_floor_aux_fan_speed");
+        optgroup->append_single_option_line("wave_overhang_floor_use_hilbert");
+        optgroup->append_single_option_line("wave_overhang_floor_hilbert_layers");
+        optgroup->append_single_option_line("wave_overhang_floor_hilbert_density");
+
+        optgroup = page->new_optgroup(L("Debug"), L"param_gcode");
+        optgroup->append_single_option_line("wave_overhang_debug_gcode");
+
     page = add_options_page(L("Strength"), "custom-gcode_strength"); // ORCA: icon only visible on placeholders
         optgroup = page->new_optgroup(L("Walls"), L"param_wall");
         optgroup->append_single_option_line("wall_loops", "strength_settings_walls#wall-loops");
@@ -3187,6 +3248,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("adaptive_infill_mode", "strength_settings_patterns#adaptive-density");
         optgroup->append_single_option_line("adaptive_infill_interior_density", "strength_settings_patterns#interior-density");
         optgroup->append_single_option_line("adaptive_infill_gradient", "strength_settings_patterns#adaptive-gradient");
+        optgroup->append_single_option_line("modular_infill_mode");
         optgroup->append_single_option_line("gyroid_optimized", "strength_settings_patterns#gyroid-optimized");
         optgroup->append_single_option_line("sparse_infill_smooth_factor", "strength_settings_infill#sparse-infill-smooth-factor");
         optgroup->append_single_option_line("infill_direction", "strength_settings_infill#direction");
@@ -3464,6 +3526,7 @@ void TabPrint::build()
 
         optgroup->append_single_option_line("timelapse_type", "others_settings_special_mode#timelapse");
         optgroup->append_single_option_line("enable_wrapping_detection", "others_settings_special_mode#enable-clumping-detection");
+        optgroup->append_single_option_line("enable_resource_optimizer");
 
         optgroup = page->new_optgroup(L("Fuzzy skin"), L"fuzzy_skin");
         optgroup->append_single_option_line("fuzzy_skin", "others_settings_fuzzy_skin#fuzzy-skin-mode");
@@ -8167,8 +8230,10 @@ bool Tab::tree_sel_change_delayed(wxCommandEvent& event)
 
         m_page_view->Thaw();
     } catch (const UIBuildCanceled&) {
-	    if (m_active_page)
+	    if (m_active_page) {
 		    m_active_page->clear();
+            m_active_page = nullptr;
+        }
         m_page_view->Thaw();
         return true;
     }
@@ -9546,6 +9611,12 @@ void Page::update_visibility(ConfigOptionMode mode, bool update_contolls_visibil
             first = false;
         }
 #endif
+    }
+
+    if (m_title == L("Wave Overhangs") || m_title == "Wave Overhangs") {
+        if (!Slic3r::Modular::ModuleManager::instance().is_plugin_active("wave_overhangs")) {
+            ret_val = false;
+        }
     }
 
     m_show = ret_val;

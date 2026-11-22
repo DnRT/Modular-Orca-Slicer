@@ -1,3 +1,4 @@
+#include "Modular/ModuleManager.hpp"
 #ifdef _WIN32
 // Keep this first. A header below reaches boost/regex, whose w32_regex_traits
 // needs the Win32 types declared already.
@@ -3445,8 +3446,11 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
     if (!use_cache) {
         // Fire the SlicingPipeline hook for `obj` iff it just (re)computed `pstep` this pass.
         auto hook_after = [this](PrintObject* obj, bool was_done, PrintObjectStep pstep, SlicingPipelineStepPlugin sstep) {
-            if (m_pipeline_plugin_active && !was_done && obj->is_step_done(pstep))
-                run_pipeline_hook(sstep, obj);
+            if (!was_done && obj->is_step_done(pstep)) {
+                if (m_pipeline_plugin_active)
+                    run_pipeline_hook(sstep, obj);
+                Slic3r::Modular::ModuleManager::instance().on_slicing_pipeline_step(static_cast<int>(sstep), obj);
+            }
         };
 
         // SlicingPipeline: dedicated slice loop so the Slice boundary is hookable before perimeters.

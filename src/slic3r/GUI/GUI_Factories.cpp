@@ -2,6 +2,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Modular/ModuleManager.hpp"
 
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectList.hpp"
@@ -122,7 +123,15 @@ std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::OBJECT_C
                     {"support_object_first_layer_gap","",35}
                     }},
     { L("Speed"), {{"support_speed", "",12}, {"support_interface_speed", "",13}
-                  }}
+                  }},
+    { L("Wave Overhangs"), {{"wave_overhangs", "", 1},
+                            {"wave_overhangs_instead_of_bridges", "", 2},
+                            {"wave_overhang_outer_perimeters", "", 3},
+                            {"wave_overhang_line_spacing", "", 4},
+                            {"wave_overhang_flow_mm3_per_mm", "", 5},
+                            {"wave_overhang_print_speed", "", 6},
+                            {"wave_overhang_floor_layers", "", 7}
+                           }}
 };
 
 std::map<std::string, std::vector<SimpleSettingData>> SettingsFactory::PART_CATEGORY_SETTINGS =
@@ -243,6 +252,8 @@ std::vector<SimpleSettingData> SettingsFactory::get_visible_options(const std::s
         //adhesion
         "brim_type", "brim_width", "brim_object_gap", "raft_layers"
         };*/
+    if (category == "Wave Overhangs" && !Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs"))
+        return {};
     std::vector<SimpleSettingData> options;
     std::map<std::string, std::vector<SimpleSettingData>>::iterator it;
 
@@ -275,6 +286,8 @@ std::map<std::string, std::vector<SimpleSettingData>> SettingsFactory::get_all_v
         for (it1 = OBJECT_CATEGORY_SETTINGS.begin(); it1 != OBJECT_CATEGORY_SETTINGS.end(); it1++)
         {
             std::string category = it1->first;
+            if (category == "Wave Overhangs" && !Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs"))
+                continue;
             it2 = PART_CATEGORY_SETTINGS.find(category);
             if (it2 != PART_CATEGORY_SETTINGS.end())
             {
@@ -351,11 +364,14 @@ std::map<std::string, std::string> SettingsFactory::CATEGORY_ICON =
     { L("Bed adhesion")         , "blank_14"    },
 //  { L("Speed > Acceleration") , "time"        },
     { L("Advanced")             , "blank_14"    },
+    { L("Wave Overhangs")       , "blank_14"    },
     // BBS: remove SLA categories
 };
 
 wxBitmap SettingsFactory::get_category_bitmap(const std::string& category_name, bool menu_bmp)
 {
+    if (category_name == "Wave Overhangs" && !Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs"))
+        return wxNullBitmap;
     if (CATEGORY_ICON.find(category_name) == CATEGORY_ICON.end())
         return wxNullBitmap;
     return create_scaled_bitmap(CATEGORY_ICON.at(category_name));

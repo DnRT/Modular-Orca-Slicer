@@ -154,6 +154,11 @@ public:
     //Extrusions estimated to be seriously malformed, estimated during "Estimating curled extrusions" step. These lines should be avoided during fast travels.
     CurledLines         curled_lines;
 
+    // Orca: wave overhang footprints
+    Polygons                wave_overhang_floor_polygons;
+    Polygons                wave_overhang_covered_polygons;
+    Polygons                wave_overhang_shadow_polygons;
+
     // BBS
     mutable ExPolygons          sharp_tails;
     mutable ExPolygons          cantilevers;

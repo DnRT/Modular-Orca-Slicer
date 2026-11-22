@@ -1,3 +1,4 @@
+#include "Modular/ModuleManager.hpp"
 #include "ClipperUtils.hpp"
 #include "ExPolygon.hpp"
 #include "Point.hpp"
@@ -2005,6 +2006,10 @@ std::vector<Polygons> slice_mesh(
     std::function<void()>             throw_on_cancel)
 {
     BOOST_LOG_TRIVIAL(debug) << "slice_mesh to polygons";
+    if (Slic3r::Modular::ModuleManager::instance().is_resource_optimizer_active()) {
+        auto opt = Slic3r::Modular::ModuleManager::instance().get_resource_optimizer();
+        if (opt) opt->on_slicing_started(mesh.indices.size());
+    }
        
     std::vector<IntersectionLines> lines;
     CoplanarEdges                  coplanar;

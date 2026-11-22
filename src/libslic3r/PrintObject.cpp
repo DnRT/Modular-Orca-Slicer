@@ -20,6 +20,8 @@
 #include "PerimeterGenerator.hpp"
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
+#include "Modular/StrategyFlags.hpp"
+#include "Modular/ModuleManager.hpp"
 #include "SLA/IndexedMesh.hpp"
 #include "Support/SupportMaterial.hpp"
 #include "Support/SupportCommon.hpp"
@@ -526,6 +528,10 @@ void PrintObject::make_perimeters()
         return;
 
     m_print->set_status(15, L("Generating walls"));
+    for (Layer *layer : m_layers) {
+        layer->wave_overhang_floor_polygons.clear();
+        layer->wave_overhang_covered_polygons.clear();
+    }
     BOOST_LOG_TRIVIAL(info) << "Generating walls..." << log_memory_info();
 
     // Revert the typed slices into untyped slices.
@@ -787,6 +793,15 @@ void PrintObject::prepare_infill()
     // the following step needs to be done before combination because it may need
     // to remove only half of the combined infill
     this->bridge_over_infill();
+    m_print->throw_if_canceled();
+
+    if (Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs")) {
+        this->apply_wave_overhang_floor_layer_authority();
+    m_print->throw_if_canceled();
+    this->apply_wave_overhang_bridge_suppression();
+    m_print->throw_if_canceled();
+        this->tag_wave_overhang_perimeters();
+    }
     m_print->throw_if_canceled();
 
     // combine fill surfaces to honor the "infill every N layers" option
@@ -1942,6 +1957,8 @@ void PrintObject::detect_surfaces_type()
 {
     BOOST_LOG_TRIVIAL(info) << "Detecting solid surfaces..." << log_memory_info();
 
+    for (Layer *l : m_layers) l->wave_overhang_shadow_polygons.clear();
+
     // Interface shells: the intersecting parts are treated as self standing objects supporting each other.
     // Each of the objects will have a full number of top / bottom layers, even if these top / bottom layers
     // are completely hidden inside a collective body of intersecting parts.
@@ -2415,6 +2432,37 @@ void PrintObject::detect_surfaces_type()
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug) << "Detecting solid surfaces for region " << region_id << " - clipping in parallel - end";
     });
+
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+        const PrintRegionConfig &rconf = this->printing_region(region_id).config();
+        const int floor_layers        = rconf.wave_overhang_floor_layers.value;
+        const int bottom_shell_layers = rconf.bottom_shell_layers.value;
+        const int top_shell_layers    = rconf.top_shell_layers.value;
+        const int shadow_up   = std::max(floor_layers, bottom_shell_layers);
+        const int shadow_down = top_shell_layers;
+        if (Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs") && rconf.wave_overhangs.value) {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, m_layers.size()),
+                [this, shadow_up, shadow_down](const tbb::blocked_range<size_t> &range) {
+                    for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
+                        Layer *layer = m_layers[idx_layer];
+                        Polygons shadow = std::move(layer->wave_overhang_shadow_polygons);
+                        append(shadow, layer->wave_overhang_floor_polygons);
+                        for (int k = 1; k <= shadow_up; ++k) {
+                            if ((int)idx_layer - k < 0) break;
+                            append(shadow, m_layers[idx_layer - k]->wave_overhang_floor_polygons);
+                        }
+                        for (int k = 1; k <= shadow_down; ++k) {
+                            if (idx_layer + k >= m_layers.size()) break;
+                            append(shadow, m_layers[idx_layer + k]->wave_overhang_floor_polygons);
+                        }
+                        if (!shadow.empty())
+                            shadow = union_(shadow);
+                        layer->wave_overhang_shadow_polygons = std::move(shadow);
+                    }
+                });
+            m_print->throw_if_canceled();
+        }
+    }
 
     // Mark the object to have the region slices classified (typed, which also means they are split based on whether they are supported, bridging, top layers etc.)
     m_typed_slices = true;
@@ -5567,5 +5615,199 @@ const Layer* PrintObject::get_layer_at_bottomz(coordf_t bottom_z, coordf_t epsil
 
 Layer* PrintObject::get_layer_at_bottomz(coordf_t bottom_z, coordf_t epsilon) { return const_cast<Layer*>(std::as_const(*this).get_layer_at_bottomz(bottom_z, epsilon)); }
 
+
+
+
+
+void PrintObject::apply_wave_overhang_floor_layer_authority()
+{
+    bool any_wave = false;
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id)
+        if (this->printing_region(region_id).config().wave_overhangs.value) {
+            any_wave = true;
+            break;
+        }
+    if (!any_wave)
+        return;
+
+    BOOST_LOG_TRIVIAL(info) << "Applying wave-overhang floor-layer authority...";
+
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+        const PrintRegionConfig &rconf = this->printing_region(region_id).config();
+        if (!rconf.wave_overhangs.value)
+            continue;
+        const int floor_layers = rconf.wave_overhang_floor_layers.value;
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, m_layers.size()),
+            [this, region_id, floor_layers](const tbb::blocked_range<size_t> &range) {
+                for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
+                    m_print->throw_if_canceled();
+                    Layer *layer = m_layers[idx_layer];
+                    if (layer->wave_overhang_shadow_polygons.empty())
+                        continue;
+
+                    Polygons own = m_layers[idx_layer]->wave_overhang_floor_polygons;
+                    if (! own.empty())
+                        own = union_(own);
+                    Polygons solid;
+                    for (int d = 1; d <= floor_layers && (int) idx_layer - d >= 0; ++d)
+                        append(solid, m_layers[idx_layer - d]->wave_overhang_floor_polygons);
+                    if (! solid.empty())
+                        solid = union_(solid);
+
+                    const Polygons solid_only = solid.empty() ? Polygons{} : diff(solid, own);
+                    Polygons covered = own;
+                    append(covered, solid);
+                    if (! covered.empty())
+                        covered = union_(covered);
+
+                    const Polygons &shadow = layer->wave_overhang_shadow_polygons;
+                    LayerRegion *layerm = layer->m_regions[region_id];
+                    Surfaces &surfs = layerm->fill_surfaces.surfaces;
+                    Surfaces new_surfaces;
+                    new_surfaces.reserve(surfs.size() + 6);
+                    for (Surface &s : surfs) {
+                        Polygons   p       = to_polygons(s);
+                        ExPolygons inside  = intersection_ex(p, shadow, ApplySafetyOffset::Yes);
+                        if (inside.empty()) {
+                            new_surfaces.push_back(std::move(s));
+                            continue;
+                        }
+                        const Polygons    inside_p = to_polygons(inside);
+                        const SurfaceType orig     = s.surface_type;
+                        const bool        is_geometric_face =
+                            orig == stTop || orig == stBottom || orig == stBottomBridge;
+
+                        for (auto &ex_out : union_safety_offset_ex(diff_ex(p, inside_p, ApplySafetyOffset::Yes)))
+                            new_surfaces.emplace_back(orig, std::move(ex_out));
+                        if (! solid_only.empty()) {
+                            const SurfaceType t = is_geometric_face ? orig : stInternalSolid;
+                            for (auto &ex_in : union_safety_offset_ex(intersection_ex(inside_p, solid_only, ApplySafetyOffset::Yes)))
+                                new_surfaces.emplace_back(t, std::move(ex_in));
+                        }
+                        const SurfaceType t = is_geometric_face ? orig : stInternal;
+                        for (auto &ex_in : union_safety_offset_ex(diff_ex(inside_p, covered, ApplySafetyOffset::Yes)))
+                            new_surfaces.emplace_back(t, std::move(ex_in));
+                    }
+                    surfs = std::move(new_surfaces);
+                }
+            });
+        m_print->throw_if_canceled();
+    }
+}
+
+void PrintObject::apply_wave_overhang_bridge_suppression()
+{
+    bool any = false;
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+        const PrintRegionConfig &rconf = this->printing_region(region_id).config();
+        if (rconf.wave_overhangs.value && rconf.wave_overhangs_instead_of_bridges.value) {
+            any = true;
+            break;
+        }
+    }
+    if (!any)
+        return;
+
+    BOOST_LOG_TRIVIAL(info) << "Applying wave-overhang bridge suppression...";
+
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+        const PrintRegionConfig &rconf = this->printing_region(region_id).config();
+        if (!rconf.wave_overhangs.value || !rconf.wave_overhangs_instead_of_bridges.value)
+            continue;
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, m_layers.size()),
+            [this, region_id](const tbb::blocked_range<size_t> &range) {
+                for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
+                    m_print->throw_if_canceled();
+                    Layer       *layer  = m_layers[idx_layer];
+                    LayerRegion *layerm = layer->m_regions[region_id];
+                    Surfaces    &surfs  = layerm->fill_surfaces.surfaces;
+                    for (Surface &s : surfs) {
+                        if (s.surface_type == stBottomBridge || s.surface_type == stInternalBridge) {
+                            s.surface_type = stInternalSolid;
+                            s.bridge_angle = 0;
+                        }
+                    }
+                }
+            });
+        m_print->throw_if_canceled();
+    }
+}
+
+namespace {
+static void tag_wave_overhang_perimeter_recursive(ExtrusionEntity *ent, bool floor_layer, int8_t distance)
+{
+    if (!ent) return;
+    auto stamp = [floor_layer, distance](ExtrusionPath &p) {
+        if (floor_layer) {
+            p.wave_overhang_floor_perimeter = true;
+            p.wave_overhang_floor_distance  = distance;
+            Modular::set_flag(p.strategy_flags, Modular::FLAG_WAVE_FLOOR_PERIMETER);
+            p.strategy_distance = static_cast<uint8_t>(distance);
+        } else {
+            p.wave_overhang_perimeter = true;
+            Modular::set_flag(p.strategy_flags, Modular::FLAG_WAVE_PERIMETER);
+        }
+    };
+    if (auto *path = dynamic_cast<ExtrusionPath*>(ent))         { stamp(*path); }
+    else if (auto *loop = dynamic_cast<ExtrusionLoop*>(ent))    { for (ExtrusionPath &p : loop->paths) stamp(p); }
+    else if (auto *mp = dynamic_cast<ExtrusionMultiPath*>(ent)) { for (ExtrusionPath &p : mp->paths)   stamp(p); }
+    else if (auto *coll = dynamic_cast<ExtrusionEntityCollection*>(ent))
+        for (ExtrusionEntity *child : coll->entities) tag_wave_overhang_perimeter_recursive(child, floor_layer, distance);
+}
+} // anonymous namespace
+
+void PrintObject::tag_wave_overhang_perimeters()
+{
+    bool any_wave = false;
+    int  max_floor_layers = 0;
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+        const PrintRegionConfig &rconf = this->printing_region(region_id).config();
+        if (Slic3r::Modular::ModuleManager::instance().has_mod("wave_overhangs") && rconf.wave_overhangs.value) {
+            any_wave = true;
+            max_floor_layers = std::max(max_floor_layers, rconf.wave_overhang_floor_layers.value);
+        }
+    }
+    if (!any_wave)
+        return;
+
+    BOOST_LOG_TRIVIAL(info) << "Tagging wave-overhang perimeters...";
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_layers.size()),
+        [this, max_floor_layers](const tbb::blocked_range<size_t> &range) {
+            for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
+                m_print->throw_if_canceled();
+                Layer *layer = m_layers[idx_layer];
+                const bool is_wave_layer  = !layer->wave_overhang_floor_polygons.empty();
+                const bool in_shadow      = !is_wave_layer && !layer->wave_overhang_shadow_polygons.empty();
+                if (!is_wave_layer && !in_shadow)
+                    continue;
+
+                int8_t distance = 0;
+                if (in_shadow && max_floor_layers > 0) {
+                    const int search_limit = std::min<int>(max_floor_layers, 127);
+                    for (int k = 1; k <= search_limit; ++k) {
+                        if ((int)idx_layer - k < 0) break;
+                        if (!m_layers[idx_layer - k]->wave_overhang_floor_polygons.empty()) {
+                            distance = static_cast<int8_t>(k);
+                            break;
+                        }
+                    }
+                }
+                const bool is_floor_layer = in_shadow && distance > 0;
+                if (!is_wave_layer && !is_floor_layer)
+                    continue;
+
+                for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+                    if (!this->printing_region(region_id).config().wave_overhangs.value)
+                        continue;
+                    LayerRegion *layerm = layer->m_regions[region_id];
+                    tag_wave_overhang_perimeter_recursive(&layerm->perimeters, is_floor_layer, distance);
+                }
+            }
+        });
+    m_print->throw_if_canceled();
+}
 
 } // namespace Slic3r

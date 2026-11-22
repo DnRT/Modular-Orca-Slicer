@@ -1,3 +1,5 @@
+#include "libslic3r/Modular/ModuleManager.hpp"
+#include "libslic3r/Print.hpp"
 #include "Layer.hpp"
 #include "ClipperUtils.hpp"
 #include "Polygon.hpp"
@@ -64,6 +66,38 @@ void Layer::make_slices()
         for (LayerRegion *layerm : m_regions)
             polygons_append(slices_p, to_polygons(layerm->slices.surfaces));
         slices = union_safety_offset_ex(slices_p);
+    }
+
+    // Adaptive 2D Simplification hook: universal across 0.2mm to 1.0mm nozzles
+    if (Slic3r::Modular::ModuleManager::instance().is_adaptive_simplifier_active()) {
+        auto simplifier = Slic3r::Modular::ModuleManager::instance().get_adaptive_simplifier();
+        if (simplifier) {
+            double nozzle_d = 0.4;
+            if (this->object() && this->object()->print()) {
+                nozzle_d = this->object()->print()->config().nozzle_diameter.get_at(0);
+            }
+            // 1. Simplify layer island bounds
+            simplifier->simplify_expolygons(slices, nozzle_d);
+
+            // 2. Propagate simplified contours directly into each region's slices!
+            // This feeds make_perimeters(), Arachne/Voronoi, and fill generation with the decimated contours.
+            if (m_regions.size() == 1) {
+                m_regions.front()->slices.set(slices, stInternal);
+            } else {
+                for (LayerRegion *layerm : m_regions) {
+                    for (Surface &surf : layerm->slices.surfaces) {
+                        simplifier->simplify_expolygon(surf.expolygon, nozzle_d);
+                    }
+                }
+            }
+
+            if (this->id() == 0 || this->id() % 100 == 0) {
+                std::cout << "[Adaptive2DSimplifier] Layer " << this->id() 
+                          << ": Simplified contours for nozzle " << nozzle_d << "mm" << std::endl;
+                BOOST_LOG_TRIVIAL(info) << "[Adaptive2DSimplifier] Layer " << this->id() 
+                                        << ": Simplified contours for nozzle " << nozzle_d << "mm";
+            }
+        }
     }
 
     this->lslices.clear();

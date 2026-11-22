@@ -118,6 +118,10 @@ public:
     std::vector<std::pair<FuzzySkinConfig, ExPolygons>> regions_by_fuzzify;
     // Area resting on the layer below, where fuzzy skin is allowed. Unset means no restriction.
     std::optional<ExPolygons>                       fuzzy_supported_area;
+
+    // Orca: wave overhang footprints
+    Polygons                                        out_wave_overhang_floor_polygons;
+    Polygons                                        out_wave_overhang_covered_polygons;
     
     PerimeterGenerator(
         // Input:
@@ -170,7 +174,7 @@ public:
 private:
     std::vector<Polygons>     generate_lower_polygons_series(float width);
     void split_top_surfaces(const ExPolygons &orig_polygons, ExPolygons &top_fills, ExPolygons &non_top_polygons, ExPolygons &fill_clip) const;
-    void apply_extra_perimeters(ExPolygons& infill_area);
+    void apply_extra_perimeters(ExPolygons& infill_area, const ExPolygon& island_region);
     void process_no_bridge(Surfaces& all_surfaces, coord_t perimeter_spacing, coord_t ext_perimeter_width);
 
 private:
@@ -183,6 +187,7 @@ private:
     //BBS
     double      m_ext_mm3_per_mm_smaller_width;
     Polygons    m_lower_slices_polygons;
+    size_t      m_island_loops_begin = 0;
 };
 
 // ORCA: a brim against the outer walls makes the first layer print them first, whatever the wall sequence, so the

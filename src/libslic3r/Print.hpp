@@ -651,6 +651,9 @@ private:
     void bridge_over_infill();
     void clip_fill_surfaces();
     void discover_horizontal_shells();
+    void apply_wave_overhang_floor_layer_authority();
+    void apply_wave_overhang_bridge_suppression();
+    void tag_wave_overhang_perimeters();
     void combine_infill();
     void _generate_support_material();
     FillAdaptive::RegionOctrees prepare_adaptive_infill_data(

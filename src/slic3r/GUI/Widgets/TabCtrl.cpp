@@ -52,6 +52,7 @@ TabCtrl::TabCtrl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSi
     hsizer->Add(sizer, 0, wxEXPAND | wxBOTTOM, border_width * 4);
     SetSizer(hsizer);
     Bind(wxEVT_COMMAND_BUTTON_CLICKED, &TabCtrl::buttonClicked, this);
+    Bind(wxEVT_MOUSEWHEEL, &TabCtrl::mouseWheel, this);
     // wxString reason;
     // IsTransparentBackgroundSupported(&reason);
 }
@@ -64,14 +65,14 @@ void TabCtrl::SelectItem(int item)
 {
     if (item == sel || !sendTabCtrlEvent(true))
         return;
-    if (sel >= 0) {
+    if (sel >= 0 && sel < static_cast<int>(btns.size())) {
         wxCommandEvent e(wxEVT_CHECKBOX);
         auto b = btns[sel];
         e.SetEventObject(b);
         b->GetEventHandler()->ProcessEvent(e);
     }
     sel = item;
-    if (sel >= 0) {
+    if (sel >= 0 && sel < static_cast<int>(btns.size())) {
         wxCommandEvent e(wxEVT_CHECKBOX);
         auto b = btns[sel];
         e.SetEventObject(b);
@@ -113,7 +114,8 @@ int TabCtrl::AppendItem(const wxString& item, int image, int selImage, void* cli
     btns.push_back(btn);
     if (btns.size() > 1)
         sizer->GetItem(sizer->GetItemCount() - 1)->SetMinSize({0, 0});
-    sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
+    btn->Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) { this->mouseWheel(e); });
+    sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, TAB_BUTTON_SPACE * 2);
     sizer->AddStretchSpacer(1);
     relayout();
     return btns.size() - 1;
@@ -247,7 +249,7 @@ void TabCtrl::DoSetSize(int x, int y, int width, int height, int sizeFlags)
 {
     auto size = GetSize();
     wxWindow::DoSetSize(x, y, width, height, sizeFlags);
-    if (size == GetSize())
+    if (m_in_relayout || (size.x == GetSize().x && size.y == GetSize().y))
         return;
     relayout();
 }
@@ -266,41 +268,73 @@ WXLRESULT TabCtrl::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam)
 
 void TabCtrl::relayout()
 {
-    int offset = 10;
-    int item   = sel + 1;
-    int first  = 0;
-    for (int i = 0; i < item; ++i)
-        offset += btns[i]->GetMinSize().x;
-    if (item < btns.size())
-        offset += btns[item]->GetMinSize().x;
-    int width = GetSize().x;
-    for (int i = 0; i < btns.size(); ++i) {
-        auto size = btns[i]->GetMinSize().x;
-        if (i < sel && offset > width) {
-            sizer->Show(i * 2 + 1, false);
-            sizer->Show(i * 2 + 2, false);
-            offset -= size;
-            first = i + 1;
-        } else if (i <= item) {
-            sizer->Show(i * 2 + 1, true);
-            sizer->Show(i * 2 + 2, true);
-        } else if (offset <= width) {
-            sizer->Show(i * 2 + 1, true);
-            sizer->Show(i * 2 + 2, true);
-            offset += size;
-            item = i;
-        } else {
-            sizer->Show(i * 2 + 1, false);
-            sizer->Show(i * 2 + 2, false);
-        }
-        sizer->GetItem(i * 2 + 2)->SetMinSize({0, 0});
+    if (m_in_relayout)
+        return;
+    m_in_relayout = true;
+
+    if (btns.empty()) {
+        Layout();
+        m_in_relayout = false;
+        return;
     }
-    if (item >= btns.size())
-        --item;
-    // Keep spacing 2 ~ 10 TAB_BUTTON_SPACE
-    int b = GetSize().x - offset - 10 - (item + 1 - first) * 16;
-    sizer->GetItem(item * 2 + 2)->SetMinSize({b > 0 ? b : 0, 0});
+
+    const size_t count = sizer ? sizer->GetItemCount() : 0;
+    const int n = static_cast<int>(btns.size());
+    const int width = GetSize().x;
+
+    if (m_first_visible < 0)
+        m_first_visible = 0;
+    if (m_first_visible >= n)
+        m_first_visible = n - 1;
+
+    if (sel >= 0 && sel < n) {
+        if (sel < m_first_visible) {
+            m_first_visible = sel;
+        } else {
+            while (m_first_visible < sel) {
+                int needed = 10;
+                for (int j = m_first_visible; j <= sel; ++j)
+                    needed += btns[j]->GetMinSize().x + TAB_BUTTON_SPACE * 2;
+                if (needed <= width)
+                    break;
+                ++m_first_visible;
+            }
+        }
+    }
+
+    int offset = 10;
+    int last_visible = m_first_visible;
+
+    for (int i = 0; i < n; ++i) {
+        bool show = false;
+        if (i >= m_first_visible) {
+            int btn_w = btns[i]->GetMinSize().x + TAB_BUTTON_SPACE * 2;
+            if (offset + btn_w <= width || i == m_first_visible) {
+                show = true;
+                offset += btn_w;
+                last_visible = i;
+            }
+        }
+
+        if (static_cast<size_t>(i * 2 + 1) < count)
+            sizer->Show(i * 2 + 1, show);
+        if (static_cast<size_t>(i * 2 + 2) < count)
+            sizer->Show(i * 2 + 2, show);
+
+        if (static_cast<size_t>(i * 2 + 2) < count) {
+            if (auto it = sizer->GetItem(i * 2 + 2))
+                it->SetMinSize({0, 0});
+        }
+    }
+
+    int b = width - offset - 10 - (last_visible + 1 - m_first_visible) * TAB_BUTTON_SPACE * 8;
+    if (last_visible >= 0 && static_cast<size_t>(last_visible * 2 + 2) < count) {
+        if (auto it = sizer->GetItem(last_visible * 2 + 2))
+            it->SetMinSize({b > 0 ? b : 0, 0});
+    }
+
     Layout();
+    m_in_relayout = false;
 }
 
 int TabCtrl::GetFullSize() const
@@ -329,10 +363,34 @@ void TabCtrl::keyDown(wxKeyEvent& event)
     case WXK_RIGHT:
         if ((event.GetKeyCode() == WXK_UP || event.GetKeyCode() == WXK_LEFT) && GetSelection() > 0) {
             SelectItem(GetSelection() - 1);
-        } else if ((event.GetKeyCode() == WXK_DOWN || event.GetKeyCode() == WXK_RIGHT) && GetSelection() + 1 < btns.size()) {
+        } else if ((event.GetKeyCode() == WXK_DOWN || event.GetKeyCode() == WXK_RIGHT) && GetSelection() + 1 < static_cast<int>(btns.size())) {
             SelectItem(GetSelection() + 1);
         }
         break;
+    default:
+        event.Skip();
+        break;
+    }
+}
+
+void TabCtrl::mouseWheel(wxMouseEvent& event)
+{
+    int rotation = event.GetWheelRotation();
+    if (rotation == 0)
+        return;
+    if (event.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL)
+        rotation = -rotation;
+
+    int new_first = m_first_visible + (rotation > 0 ? -1 : 1);
+    if (new_first < 0)
+        new_first = 0;
+    if (new_first >= static_cast<int>(btns.size()))
+        new_first = static_cast<int>(btns.size()) - 1;
+
+    if (new_first != m_first_visible) {
+        m_first_visible = new_first;
+        relayout();
+        Refresh();
     }
 }
 
@@ -340,35 +398,19 @@ void TabCtrl::doRender(wxDC& dc)
 {
     wxSize size = GetSize();
     int states  = state_handler.states();
-    if (sel < 0) {
-        return;
-    }
-
-    auto x1       = btns[sel]->GetPosition().x;
-    auto x2       = x1 + btns[sel]->GetSize().x;
     const int BS2 = (1 + border_width) / 2;
-#if 0
-    const int BS = border_width / 2;
-    x1 -= TAB_BUTTON_SPACE; x2 += TAB_BUTTON_SPACE;
-    dc.SetPen(wxPen(border_color.colorForStates(states), border_width));
-    dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    dc.DrawLine(0, size.y - BS2, x1 - radius + BS2, size.y - BS2);
-    dc.DrawArc(x1 - radius, size.y, x1, size.y - radius, x1 - radius, size.y - radius);
-    dc.DrawLine(x1, size.y - radius, x1, radius);
-    dc.DrawArc(x1 + radius, 0, x1, radius, x1 + radius, radius);
-    dc.DrawLine(x1 + radius, BS, x2 - radius, BS);
-    dc.DrawArc(x2, radius, x2 - radius, 0, x2 - radius, radius);
-    dc.DrawLine(x2, radius, x2, size.y - radius);
-    dc.DrawArc(x2, size.y - radius, x2 + radius, size.y, x2 + radius, size.y - radius);
-    dc.DrawLine(x2 + radius - BS2, size.y - BS2, size.x, size.y - BS2);
-#else
+
     dc.SetPen(wxPen(border_color.colorForStates(states), border_width));
     dc.DrawLine(0, size.y - BS2, size.x, size.y - BS2);
-    wxColour c("#009688"); // ORCA selected tab underline stroke color
-    dc.SetPen(wxPen(c, 1));
-    dc.SetBrush(c);
-    dc.DrawRoundedRectangle(x1 - radius, size.y - BS2 - border_width * 3, x2 + radius * 2 - x1, border_width * 3, radius);
-#endif
+
+    if (sel >= 0 && sel < static_cast<int>(btns.size()) && btns[sel]->IsShown()) {
+        auto x1 = btns[sel]->GetPosition().x;
+        auto x2 = x1 + btns[sel]->GetSize().x;
+        wxColour c("#009688"); // ORCA selected tab underline stroke color
+        dc.SetPen(wxPen(c, 1));
+        dc.SetBrush(c);
+        dc.DrawRoundedRectangle(x1 - radius, size.y - BS2 - border_width * 3, x2 + radius * 2 - x1, border_width * 3, radius);
+    }
 }
 
 bool TabCtrl::sendTabCtrlEvent(bool changing)

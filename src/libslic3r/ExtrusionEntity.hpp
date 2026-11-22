@@ -188,6 +188,11 @@ public:
     // Modular strategy classification flags (e.g., wave overhangs, non-planar 3D, arc)
     uint32_t strategy_flags = 0;
     uint8_t  strategy_distance = 0;
+    bool wave_overhang = false;
+    bool wave_overhang_floor = false;
+    bool wave_overhang_perimeter = false;
+    bool wave_overhang_floor_perimeter = false;
+    int8_t wave_overhang_floor_distance = 0;
 
     ExtrusionPath() : mm3_per_mm(-1), width(-1), height(-1), m_role(erNone), m_no_extrusion(false) {}
     ExtrusionPath(ExtrusionRole role) : mm3_per_mm(-1), width(-1), height(-1), m_role(role), m_no_extrusion(false) {}
@@ -204,6 +209,11 @@ public:
         , z_contoured(rhs.z_contoured)
         , strategy_flags(rhs.strategy_flags)
         , strategy_distance(rhs.strategy_distance)
+        , wave_overhang(rhs.wave_overhang)
+        , wave_overhang_floor(rhs.wave_overhang_floor)
+        , wave_overhang_perimeter(rhs.wave_overhang_perimeter)
+        , wave_overhang_floor_perimeter(rhs.wave_overhang_floor_perimeter)
+        , wave_overhang_floor_distance(rhs.wave_overhang_floor_distance)
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
@@ -219,6 +229,11 @@ public:
         , z_contoured(rhs.z_contoured)
         , strategy_flags(rhs.strategy_flags)
         , strategy_distance(rhs.strategy_distance)
+        , wave_overhang(rhs.wave_overhang)
+        , wave_overhang_floor(rhs.wave_overhang_floor)
+        , wave_overhang_perimeter(rhs.wave_overhang_perimeter)
+        , wave_overhang_floor_perimeter(rhs.wave_overhang_floor_perimeter)
+        , wave_overhang_floor_distance(rhs.wave_overhang_floor_distance)
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
@@ -234,6 +249,11 @@ public:
         , z_contoured(rhs.z_contoured)
         , strategy_flags(rhs.strategy_flags)
         , strategy_distance(rhs.strategy_distance)
+        , wave_overhang(rhs.wave_overhang)
+        , wave_overhang_floor(rhs.wave_overhang_floor)
+        , wave_overhang_perimeter(rhs.wave_overhang_perimeter)
+        , wave_overhang_floor_perimeter(rhs.wave_overhang_floor_perimeter)
+        , wave_overhang_floor_distance(rhs.wave_overhang_floor_distance)
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
@@ -249,6 +269,11 @@ public:
         , z_contoured(rhs.z_contoured)
         , strategy_flags(rhs.strategy_flags)
         , strategy_distance(rhs.strategy_distance)
+        , wave_overhang(rhs.wave_overhang)
+        , wave_overhang_floor(rhs.wave_overhang_floor)
+        , wave_overhang_perimeter(rhs.wave_overhang_perimeter)
+        , wave_overhang_floor_perimeter(rhs.wave_overhang_floor_perimeter)
+        , wave_overhang_floor_distance(rhs.wave_overhang_floor_distance)
         , m_can_reverse(rhs.m_can_reverse)
         , m_role(rhs.m_role)
         , m_no_extrusion(rhs.m_no_extrusion)
@@ -265,6 +290,11 @@ public:
         this->z_contoured = rhs.z_contoured;
         this->strategy_flags = rhs.strategy_flags;
         this->strategy_distance = rhs.strategy_distance;
+        this->wave_overhang = rhs.wave_overhang;
+        this->wave_overhang_floor = rhs.wave_overhang_floor;
+        this->wave_overhang_perimeter = rhs.wave_overhang_perimeter;
+        this->wave_overhang_floor_perimeter = rhs.wave_overhang_floor_perimeter;
+        this->wave_overhang_floor_distance = rhs.wave_overhang_floor_distance;
         this->overhang_degree = rhs.overhang_degree;
         this->curve_degree = rhs.curve_degree;
         this->polyline = rhs.polyline;
@@ -281,6 +311,11 @@ public:
         this->z_contoured = rhs.z_contoured;
         this->strategy_flags = rhs.strategy_flags;
         this->strategy_distance = rhs.strategy_distance;
+        this->wave_overhang = rhs.wave_overhang;
+        this->wave_overhang_floor = rhs.wave_overhang_floor;
+        this->wave_overhang_perimeter = rhs.wave_overhang_perimeter;
+        this->wave_overhang_floor_perimeter = rhs.wave_overhang_floor_perimeter;
+        this->wave_overhang_floor_distance = rhs.wave_overhang_floor_distance;
         this->overhang_degree = rhs.overhang_degree;
         this->curve_degree = rhs.curve_degree;
         this->polyline = std::move(rhs.polyline);

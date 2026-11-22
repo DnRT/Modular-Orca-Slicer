@@ -9683,7 +9683,30 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string &path_d
             }
     }
 
+    if (path.wave_overhang) {
+        speed = m_config.wave_overhang_print_speed.value;
+        requires_segmented_extrusion = false;
+        new_points.clear();
+    } else if (path.wave_overhang_floor && m_config.wave_overhang_floor_print_speed.value > 0) {
+        speed = m_config.wave_overhang_floor_print_speed.value;
+        requires_segmented_extrusion = false;
+        new_points.clear();
+    } else if (path.wave_overhang_perimeter && m_config.wave_overhang_perimeter_speed.value > 0) {
+        speed = m_config.wave_overhang_perimeter_speed.value;
+        requires_segmented_extrusion = false;
+        new_points.clear();
+    } else if (path.wave_overhang_floor_perimeter && m_config.wave_overhang_floor_perimeter_speed.value > 0) {
+        speed = m_config.wave_overhang_floor_perimeter_speed.value;
+        requires_segmented_extrusion = false;
+        new_points.clear();
+    }
     double F = speed * 60;  // convert mm/sec to mm/min
+    if (path.wave_overhang) {
+        const double wave_end_retract = m_config.wave_overhang_end_retract_length.value;
+        if (wave_end_retract > 0.) {
+            gcode += m_writer.retract(false, wave_end_retract);
+        }
+    }
     
     // Orca: Dynamic PA
     // If adaptive PA is enabled, by default evaluate PA on all extrusion moves
