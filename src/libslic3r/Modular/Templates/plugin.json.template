@@ -1,0 +1,30 @@
+{
+  "id": "com.community.custom_overhang",
+  "name": "Custom Geometric Overhang Generator",
+  "version": "1.0.0",
+  "author": "Community Developer",
+  "description": "High-efficiency overhang toolpath synthesis algorithm for extreme bridges without support material.",
+  "category": "OverhangStrategy",
+  "entry_point": "libcustom_overhang.dll",
+  "target_hook": "OverhangStrategy",
+  "min_orcaslicer_version": "2.3.0",
+  "active_by_default": true,
+  "parameters": [
+    {
+      "key": "bridge_angle_threshold",
+      "label": "Overhang Angle Threshold (°)",
+      "type": "float",
+      "default": 45.0,
+      "min": 10.0,
+      "max": 85.0,
+      "description": "Angles steeper than this value will use the custom geometric generator."
+    },
+    {
+      "key": "enable_flow_compensation",
+      "label": "Enable Adaptive Flow",
+      "type": "bool",
+      "default": true,
+      "description": "Automatically modulates extrusion width across floating arcs."
+    }
+  ]
+}
